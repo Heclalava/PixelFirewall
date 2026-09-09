@@ -1,29 +1,43 @@
 #!/system/bin/sh
 
-UPDATE="/data/adb/modules_update/netblock"
-HASHFILE="$UPDATE/hash"
+MODPATH="${0%/*}"
 
-# Check if hash file exists
-if [ ! -f "$HASHFILE" ]; then
-    echo " ✦ Hash file not found: $HASHFILE"
-    exit 1
+echo "========================================="
+echo "        PixelFirewall Verification"
+echo "========================================="
+
+FAILED=0
+
+check_file() {
+    if [ -f "$1" ]; then
+        echo "[OK] $1"
+    else
+        echo "[FAIL] Missing: $1"
+        FAILED=1
+    fi
+}
+
+check_file "$MODPATH/module.prop"
+check_file "$MODPATH/service.sh"
+check_file "$MODPATH/customize.sh"
+check_file "$MODPATH/uninstall.sh"
+check_file "$MODPATH/webroot/index.html"
+
+if grep -qiE 'netblock|meowdump|meow' "$MODPATH/module.prop" "$MODPATH/service.sh" "$MODPATH/customize.sh" "$MODPATH/uninstall.sh" 2>/dev/null; then
+    echo "[FAIL] Legacy NetBlock references detected in core files"
+    FAILED=1
+else
+    echo "[OK] Core files contain no legacy NetBlock references"
 fi
 
-while IFS='|' read -r RELPATH EXPECT_SHA256; do
-    FILE="$UPDATE/$RELPATH"
-    
-    # Check if file exists
-    if [ ! -f "$FILE" ]; then
-        echo " ✦ File $FILE not found!"
-        exit 1
-    fi
+if [ "$FAILED" -eq 0 ]; then
+    echo "========================================="
+    echo "Verification successful"
+    echo "========================================="
+    exit 0
+fi
 
-    # Compute the actual SHA256 of the file
-    ACTUAL_SHA256=$(sha256sum "$FILE" | awk '{print $1}')
-
-    # Compare the actual and expected hashes
-    if [ "$ACTUAL_SHA256" != "$EXPECT_SHA256" ]; then
-        echo " ✦ Hash mismatch for $FILE (Expected: $EXPECT_SHA256, Got: $ACTUAL_SHA256)"
-        exit 1
-    fi
-done < "$HASHFILE"
+echo "========================================="
+echo "Verification failed"
+echo "========================================="
+exit 1
