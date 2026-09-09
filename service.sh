@@ -4,6 +4,8 @@ MODDIR="${0%/*}"
 DATA_DIR="/data/adb/pixelfirewall"
 LOG_FILE="$DATA_DIR/service.log"
 STATE_FILE="$DATA_DIR/network.state"
+POLICY_FILE="$DATA_DIR/policy.conf"
+POLICY_STATE_FILE="$DATA_DIR/policy.applied"
 
 IPTABLES="/system/bin/iptables"
 IP6TABLES="/system/bin/ip6tables"
@@ -20,6 +22,9 @@ umask 077
 
 mkdir -p "$DATA_DIR"
 chmod 700 "$DATA_DIR"
+
+touch "$POLICY_FILE"
+chmod 600 "$POLICY_FILE"
 
 log_msg() {
     echo "[$(/system/bin/date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
@@ -54,10 +59,27 @@ create_chain() {
 setup_base_ipv4() {
     remove_all_jumps "$IPTABLES" "$MAIN_CHAIN"
 
-    create_chain "$IPTABLES" "$MAIN_CHAIN" || return 1
-    create_chain "$IPTABLES" "$MOBILE_CHAIN" || return 1
-    create_chain "$IPTABLES" "$WIFI_CHAIN" || return 1
-    create_chain "$IPTABLES" "$LAN_CHAIN" || return 1
+    if ! chain_exists "$IPTABLES" "$MAIN_CHAIN"; then
+        "$IPTABLES" -N "$MAIN_CHAIN" || return 1
+    else
+        "$IPTABLES" -F "$MAIN_CHAIN" || return 1
+    fi
+
+    if ! chain_exists "$IPTABLES" "$MOBILE_CHAIN"; then
+        "$IPTABLES" -N "$MOBILE_CHAIN" || return 1
+    fi
+
+    if ! chain_exists "$IPTABLES" "$WIFI_CHAIN"; then
+        "$IPTABLES" -N "$WIFI_CHAIN" || return 1
+    fi
+
+    if ! chain_exists "$IPTABLES" "$LAN_CHAIN"; then
+        "$IPTABLES" -N "$LAN_CHAIN" || return 1
+    fi
+
+    "$IPTABLES" -F "$MOBILE_CHAIN" || return 1
+    "$IPTABLES" -F "$WIFI_CHAIN" || return 1
+    "$IPTABLES" -F "$LAN_CHAIN" || return 1
 
     "$IPTABLES" -A "$MOBILE_CHAIN" -j RETURN || return 1
     "$IPTABLES" -A "$WIFI_CHAIN" -j RETURN || return 1
@@ -72,10 +94,27 @@ setup_base_ipv4() {
 setup_base_ipv6() {
     remove_all_jumps "$IP6TABLES" "$MAIN_CHAIN"
 
-    create_chain "$IP6TABLES" "$MAIN_CHAIN" || return 1
-    create_chain "$IP6TABLES" "$MOBILE_CHAIN" || return 1
-    create_chain "$IP6TABLES" "$WIFI_CHAIN" || return 1
-    create_chain "$IP6TABLES" "$LAN_CHAIN" || return 1
+    if ! chain_exists "$IP6TABLES" "$MAIN_CHAIN"; then
+        "$IP6TABLES" -N "$MAIN_CHAIN" || return 1
+    else
+        "$IP6TABLES" -F "$MAIN_CHAIN" || return 1
+    fi
+
+    if ! chain_exists "$IP6TABLES" "$MOBILE_CHAIN"; then
+        "$IP6TABLES" -N "$MOBILE_CHAIN" || return 1
+    fi
+
+    if ! chain_exists "$IP6TABLES" "$WIFI_CHAIN"; then
+        "$IP6TABLES" -N "$WIFI_CHAIN" || return 1
+    fi
+
+    if ! chain_exists "$IP6TABLES" "$LAN_CHAIN"; then
+        "$IP6TABLES" -N "$LAN_CHAIN" || return 1
+    fi
+
+    "$IP6TABLES" -F "$MOBILE_CHAIN" || return 1
+    "$IP6TABLES" -F "$WIFI_CHAIN" || return 1
+    "$IP6TABLES" -F "$LAN_CHAIN" || return 1
 
     "$IP6TABLES" -A "$MOBILE_CHAIN" -j RETURN || return 1
     "$IP6TABLES" -A "$WIFI_CHAIN" -j RETURN || return 1
@@ -93,7 +132,6 @@ normalize_ipv6_64() {
     ADDR="${ADDR%%/*}"
 
     echo "$ADDR" | awk -F: '
-
     {
         left=$0
         right=""
@@ -113,7 +151,6 @@ normalize_ipv6_64() {
                 rn=split(right,r,":")
 
             missing=8-ln-rn
-
             n=0
 
             for (i=1;i<=ln;i++) {
@@ -155,7 +192,7 @@ build_network_state() {
             else
                 "$IP" -4 -o addr show dev wlan0 scope global 2>/dev/null |
                     awk '
-                    function network(ip, prefix,    a,n,bits,mask,i,out) {
+                    function network(ip, prefix,    a,n,b,mask,i,out) {
                         split(ip,a,".")
                         n=prefix
                         out=""
@@ -204,37 +241,17 @@ build_network_state() {
 
 restore_fail_open() {
     "$IPTABLES" -F "$MAIN_CHAIN" >/dev/null 2>&1
-    "$IPTABLES" -F "$MOBILE_CHAIN" >/dev/null 2>&1
-    "$IPTABLES" -F "$WIFI_CHAIN" >/dev/null 2>&1
-    "$IPTABLES" -F "$LAN_CHAIN" >/dev/null 2>&1
-
     "$IP6TABLES" -F "$MAIN_CHAIN" >/dev/null 2>&1
-    "$IP6TABLES" -F "$MOBILE_CHAIN" >/dev/null 2>&1
-    "$IP6TABLES" -F "$WIFI_CHAIN" >/dev/null 2>&1
-    "$IP6TABLES" -F "$LAN_CHAIN" >/dev/null 2>&1
 
     "$IPTABLES" -A "$MAIN_CHAIN" -j RETURN >/dev/null 2>&1
     "$IP6TABLES" -A "$MAIN_CHAIN" -j RETURN >/dev/null 2>&1
-    "$IPTABLES" -A "$MOBILE_CHAIN" -j RETURN >/dev/null 2>&1
-    "$IPTABLES" -A "$WIFI_CHAIN" -j RETURN >/dev/null 2>&1
-    "$IPTABLES" -A "$LAN_CHAIN" -j RETURN >/dev/null 2>&1
-    "$IP6TABLES" -A "$MOBILE_CHAIN" -j RETURN >/dev/null 2>&1
-    "$IP6TABLES" -A "$WIFI_CHAIN" -j RETURN >/dev/null 2>&1
-    "$IP6TABLES" -A "$LAN_CHAIN" -j RETURN >/dev/null 2>&1
 }
 
 rebuild_dispatcher() {
     NEW_STATE="$1"
 
     "$IPTABLES" -F "$MAIN_CHAIN" || return 1
-    "$IPTABLES" -F "$MOBILE_CHAIN" || return 1
-    "$IPTABLES" -F "$WIFI_CHAIN" || return 1
-    "$IPTABLES" -F "$LAN_CHAIN" || return 1
-
     "$IP6TABLES" -F "$MAIN_CHAIN" || return 1
-    "$IP6TABLES" -F "$MOBILE_CHAIN" || return 1
-    "$IP6TABLES" -F "$WIFI_CHAIN" || return 1
-    "$IP6TABLES" -F "$LAN_CHAIN" || return 1
 
     while IFS='|' read -r TYPE VALUE; do
         case "$TYPE" in
@@ -262,14 +279,6 @@ rebuild_dispatcher() {
     "$IPTABLES" -A "$MAIN_CHAIN" -j RETURN || return 1
     "$IP6TABLES" -A "$MAIN_CHAIN" -j RETURN || return 1
 
-    "$IPTABLES" -A "$MOBILE_CHAIN" -j RETURN || return 1
-    "$IPTABLES" -A "$WIFI_CHAIN" -j RETURN || return 1
-    "$IPTABLES" -A "$LAN_CHAIN" -j RETURN || return 1
-
-    "$IP6TABLES" -A "$MOBILE_CHAIN" -j RETURN || return 1
-    "$IP6TABLES" -A "$WIFI_CHAIN" -j RETURN || return 1
-    "$IP6TABLES" -A "$LAN_CHAIN" -j RETURN || return 1
-
     return 0
 }
 
@@ -293,6 +302,149 @@ apply_dispatcher() {
     restore_fail_open
     log_msg "ERROR: Network dispatcher rebuild failed; fail-open restored"
     return 1
+}
+
+policy_line_valid() {
+    UID_VALUE="$1"
+    NETWORK="$2"
+    ACTION="$3"
+
+    case "$UID_VALUE" in
+        ''|*[!0-9]*) return 1 ;;
+    esac
+
+    [ "$UID_VALUE" -gt 0 ] 2>/dev/null || return 1
+
+    case "$NETWORK" in
+        MOBILE|WIFI|LAN) ;;
+        *) return 1 ;;
+    esac
+
+    [ "$ACTION" = "BLOCK" ] || return 1
+
+    return 0
+}
+
+validate_policy() {
+    LINE_NO=0
+
+    while IFS='|' read -r UID_VALUE NETWORK ACTION EXTRA; do
+        LINE_NO=$((LINE_NO + 1))
+
+        [ -z "$UID_VALUE$NETWORK$ACTION$EXTRA" ] && continue
+        case "$UID_VALUE" in
+            \#*) continue ;;
+        esac
+
+        if [ -n "$EXTRA" ] || ! policy_line_valid "$UID_VALUE" "$NETWORK" "$ACTION"; then
+            log_msg "ERROR: Invalid policy line $LINE_NO"
+            return 1
+        fi
+    done < "$POLICY_FILE"
+
+    return 0
+}
+
+restore_policy_fail_open() {
+    "$IPTABLES" -F "$MOBILE_CHAIN" >/dev/null 2>&1
+    "$IPTABLES" -F "$WIFI_CHAIN" >/dev/null 2>&1
+    "$IPTABLES" -F "$LAN_CHAIN" >/dev/null 2>&1
+
+    "$IP6TABLES" -F "$MOBILE_CHAIN" >/dev/null 2>&1
+    "$IP6TABLES" -F "$WIFI_CHAIN" >/dev/null 2>&1
+    "$IP6TABLES" -F "$LAN_CHAIN" >/dev/null 2>&1
+
+    "$IPTABLES" -A "$MOBILE_CHAIN" -j RETURN >/dev/null 2>&1
+    "$IPTABLES" -A "$WIFI_CHAIN" -j RETURN >/dev/null 2>&1
+    "$IPTABLES" -A "$LAN_CHAIN" -j RETURN >/dev/null 2>&1
+
+    "$IP6TABLES" -A "$MOBILE_CHAIN" -j RETURN >/dev/null 2>&1
+    "$IP6TABLES" -A "$WIFI_CHAIN" -j RETURN >/dev/null 2>&1
+    "$IP6TABLES" -A "$LAN_CHAIN" -j RETURN >/dev/null 2>&1
+}
+
+apply_policy() {
+    if ! validate_policy; then
+        restore_policy_fail_open
+        log_msg "ERROR: Invalid policy; fail-open policy restored"
+        return 1
+    fi
+
+    TMP_POLICY="$DATA_DIR/policy.normalized.$$"
+
+    awk -F'|' '
+        /^[[:space:]]*#/ {next}
+        NF == 0 {next}
+        NF == 3 {print $1 "|" $2 "|" $3}
+    ' "$POLICY_FILE" | sort -u > "$TMP_POLICY"
+
+    if [ -f "$POLICY_STATE_FILE" ] && cmp -s "$TMP_POLICY" "$POLICY_STATE_FILE"; then
+        rm -f "$TMP_POLICY"
+        return 0
+    fi
+
+    "$IPTABLES" -F "$MOBILE_CHAIN" || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
+    "$IPTABLES" -F "$WIFI_CHAIN" || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
+    "$IPTABLES" -F "$LAN_CHAIN" || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
+
+    "$IP6TABLES" -F "$MOBILE_CHAIN" || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
+    "$IP6TABLES" -F "$WIFI_CHAIN" || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
+    "$IP6TABLES" -F "$LAN_CHAIN" || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
+
+    while IFS='|' read -r UID_VALUE NETWORK ACTION; do
+        case "$NETWORK" in
+            MOBILE)
+                "$IPTABLES" -A "$MOBILE_CHAIN" -m owner --uid-owner "$UID_VALUE" -j DROP || {
+                    rm -f "$TMP_POLICY"
+                    restore_policy_fail_open
+                    return 1
+                }
+                "$IP6TABLES" -A "$MOBILE_CHAIN" -m owner --uid-owner "$UID_VALUE" -j DROP || {
+                    rm -f "$TMP_POLICY"
+                    restore_policy_fail_open
+                    return 1
+                }
+                ;;
+            WIFI)
+                "$IPTABLES" -A "$WIFI_CHAIN" -m owner --uid-owner "$UID_VALUE" -j DROP || {
+                    rm -f "$TMP_POLICY"
+                    restore_policy_fail_open
+                    return 1
+                }
+                "$IP6TABLES" -A "$WIFI_CHAIN" -m owner --uid-owner "$UID_VALUE" -j DROP || {
+                    rm -f "$TMP_POLICY"
+                    restore_policy_fail_open
+                    return 1
+                }
+                ;;
+            LAN)
+                "$IPTABLES" -A "$LAN_CHAIN" -m owner --uid-owner "$UID_VALUE" -j DROP || {
+                    rm -f "$TMP_POLICY"
+                    restore_policy_fail_open
+                    return 1
+                }
+                "$IP6TABLES" -A "$LAN_CHAIN" -m owner --uid-owner "$UID_VALUE" -j DROP || {
+                    rm -f "$TMP_POLICY"
+                    restore_policy_fail_open
+                    return 1
+                }
+                ;;
+        esac
+    done < "$TMP_POLICY"
+
+    "$IPTABLES" -A "$MOBILE_CHAIN" -j RETURN || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
+    "$IPTABLES" -A "$WIFI_CHAIN" -j RETURN || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
+    "$IPTABLES" -A "$LAN_CHAIN" -j RETURN || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
+
+    "$IP6TABLES" -A "$MOBILE_CHAIN" -j RETURN || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
+    "$IP6TABLES" -A "$WIFI_CHAIN" -j RETURN || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
+    "$IP6TABLES" -A "$LAN_CHAIN" -j RETURN || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
+
+    mv -f "$TMP_POLICY" "$POLICY_STATE_FILE"
+    chmod 600 "$POLICY_STATE_FILE"
+
+    log_msg "Firewall policy updated"
+    return 0
 }
 
 log_msg "=== PixelFirewall Activated ==="
@@ -319,9 +471,18 @@ else
     log_msg "ERROR: Network dispatcher initialization failed"
 fi
 
-log_msg "=== PixelFirewall Ready (Phase 2, fail-open) ==="
+rm -f "$POLICY_STATE_FILE"
+
+if apply_policy; then
+    log_msg "Firewall policy initialized"
+else
+    log_msg "ERROR: Firewall policy initialization failed"
+fi
+
+log_msg "=== PixelFirewall Ready (Phase 3, fail-open) ==="
 
 while true; do
     sleep "$POLL_INTERVAL"
     apply_dispatcher
+    apply_policy
 done
