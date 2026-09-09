@@ -17,7 +17,7 @@ esac
 
 if [ "$DIRFILE" = "policy.conf" ]; then
     case "$EVENTS" in
-        *m*|*n*) exec /system/bin/sh "$SERVICE" --policy-event ;;
+        *m*|*y*|*n*|*d*) exec /system/bin/sh "$SERVICE" --policy-event ;;
     esac
 fi
 
