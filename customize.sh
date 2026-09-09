@@ -1,130 +1,57 @@
 #!/system/bin/sh
 
-# Module and log directory paths
 MODDIR="${0%/*}"
-LOG_DIR="/data/adb/netblock"
-INSTALL_LOG="$LOG_DIR/Installation.log"
-MEOW="/data/adb/modules/netblock"
-SRC="/data/adb/modules_update/netblock/module.prop"
-DEST="$MEOW/module.prop"
+DATA_DIR="/data/adb/pixelfirewall"
+INSTALL_LOG="$DATA_DIR/installation.log"
 
-# Create log directory if it doesn't exist
-mkdir -p "$LOG_DIR" || true
-mkdir -p "$MEOW"
+mkdir -p "$DATA_DIR"
+chmod 700 "$DATA_DIR"
 
-# Logger
-debug() {
-    echo "$1" | tee -a "$INSTALL_LOG"
+log_msg() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$INSTALL_LOG"
 }
 
-# Module info variables
-MODNAME=$(grep_prop name $TMPDIR/module.prop)
-MODVER=$(grep_prop version $TMPDIR/module.prop)
-AUTHOR=$(grep_prop author $TMPDIR/module.prop)
-TIME=$(date "+%d, %b - %H:%M %Z")
+MODNAME=$(grep_prop name "$TMPDIR/module.prop")
+MODVER=$(grep_prop version "$TMPDIR/module.prop")
+AUTHOR=$(grep_prop author "$TMPDIR/module.prop")
 
-# Gather system information
 BRAND=$(getprop ro.product.brand)
 MODEL=$(getprop ro.product.model)
-DEVICE=$(getprop ro.product.device)
 ANDROID=$(getprop ro.system.build.version.release)
-SDK=$(getprop ro.system.build.version.sdk)
-ARCH=$(getprop ro.product.cpu.abi)
-BUILD_DATE=$(getprop ro.system.build.date)
-ROM_TYPE=$(getprop ro.system.build.type)
 SDK=$(getprop ro.build.version.sdk)
+ARCH=$(getprop ro.product.cpu.abi)
 SE=$(getenforce)
 
-# Display module details
-display_header() {
-    debug
-    debug "========================================="
-    debug "          Module Information     "
-    debug "========================================="
-    debug " ✦ Module Name   : $MODNAME"
-    debug " ✦ Version       : $MODVER"
-    debug " ✦ Author        : $AUTHOR"
-    debug " ✦ Started at    : $TIME"
-    debug "_________________________________________"
-    debug
-    debug
-    debug
-}
+log_msg "========================================="
+log_msg "          PixelFirewall Installer"
+log_msg "========================================="
+log_msg "Module Name    : $MODNAME"
+log_msg "Version        : $MODVER"
+log_msg "Author         : $AUTHOR"
+log_msg "Device         : $BRAND $MODEL"
+log_msg "Android        : $ANDROID (SDK $SDK)"
+log_msg "Architecture   : $ARCH"
+log_msg "SELinux        : $SE"
+log_msg "Module Path    : $MODDIR"
+log_msg "Data Path      : $DATA_DIR"
+log_msg "========================================="
 
-# Verify module integrity
-check_integrity() {
-    debug "========================================="
-    debug "                Meow Installer    "
-    debug "========================================="
-    debug " ✦ Verifying Module Integrity    "
-    
-    if [ -n "$ZIPFILE" ] && [ -f "$ZIPFILE" ]; then
-        if [ -f "$MODPATH/verify.sh" ]; then
-            if sh "$MODPATH/verify.sh"; then
-                debug " ✦ Module integrity verified." > /dev/null 2>&1
-            else
-                debug " ✘ Module integrity check failed!"
-                exit 1
-            fi
-        else
-            debug " ✘ Missing verification script!"
-            exit 1
-        fi
-    fi
-}
+if [ ! -f "$MODDIR/service.sh" ]; then
+    log_msg "ERROR: service.sh is missing"
+    exit 1
+fi
 
-# Handle module prop file
-handle_module_props() {
-    debug " ✦ Handling Module Properties "
-    touch "$MEOW/update"
-    cp "$SRC" "$DEST"
-}
+if [ ! -x "$MODDIR/service.sh" ]; then
+    chmod 755 "$MODDIR/service.sh"
+fi
 
-# Gather additional system info
-gather_system_info() {
-    debug "========================================="
-    debug "          Gathering System Info "
-    debug "========================================="
-    debug " ✦ Device Brand   : $BRAND"
-    debug " ✦ Device Model   : $MODEL"
-    debug " ✦ Android Version: $ANDROID (SDK $SDK)"
-    debug " ✦ Architecture   : $ARCH"
-    debug " ✦ SELinux Status : $SE"
-    debug " ✦ ROM Type       : $ROM_TYPE"
-    debug " ✦ Build Date     : $BUILD_DATE"
-    debug "_________________________________________"
-    debug
-    debug
-    debug
-}
+if [ -f "$MODDIR/uninstall.sh" ]; then
+    chmod 755 "$MODDIR/uninstall.sh"
+fi
 
-# Release the source
-release_source() {
-    [ -f "/sdcard/meow" ] && return 0
-    nohup am start -a android.intent.action.VIEW -d "https://t.me/MeowDump" > /dev/null 2>&1 &
-}
+touch "$DATA_DIR/blocked_uids.txt"
+chmod 600 "$DATA_DIR/blocked_uids.txt"
 
-# Final footer message
-display_footer() {
-    debug "_________________________________________"
-    debug
-    debug "             Installation Completed "
-    debug "   This module was released by 𝗠𝗘𝗢𝗪 𝗗𝗨𝗠𝗣"
-    debug
-    debug
-}
-
-# Main installation flow
-install_module() {
-    display_header
-    gather_system_info
-    check_integrity
-    handle_module_props
-    release_source
-    display_footer
-}
-
-# Start the installation process
-install_module
-touch "/sdcard/meow"
+log_msg "PixelFirewall installation files verified"
+log_msg "Installation completed"
 exit 0
