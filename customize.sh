@@ -36,14 +36,7 @@ log_msg "Module Path    : $MODDIR"
 log_msg "Data Path      : $DATA_DIR"
 log_msg "========================================="
 
-if [ ! -f "$MODDIR/service.sh" ]; then
-    log_msg "ERROR: service.sh is missing"
-    exit 1
-fi
 
-if [ ! -x "$MODDIR/service.sh" ]; then
-    chmod 755 "$MODDIR/service.sh"
-fi
 
 if [ -f "$MODDIR/uninstall.sh" ]; then
     chmod 755 "$MODDIR/uninstall.sh"
