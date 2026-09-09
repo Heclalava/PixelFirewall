@@ -42,6 +42,8 @@ if [ -f "$MODDIR/uninstall.sh" ]; then
     chmod 755 "$MODDIR/uninstall.sh"
 fi
 
+chmod 755 "$MODDIR/policy-watch.sh" "$MODDIR/policy-watch.sh-handler"
+
 touch "$DATA_DIR/blocked_uids.txt"
 chmod 600 "$DATA_DIR/blocked_uids.txt"
 
