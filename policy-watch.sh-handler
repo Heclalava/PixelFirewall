@@ -1,4 +1,14 @@
 #!/system/bin/sh
 MODDIR="${0%/*}"
 SERVICE="$MODDIR/service.sh"
-exec /system/bin/sh "$SERVICE" --policy-event
+
+/system/bin/sh "$SERVICE" --policy-event
+
+PPID_CMDLINE="$(cat "/proc/$PPID/cmdline" 2>/dev/null)"
+case "$PPID_CMDLINE" in
+    *inotifyd*)
+        kill "$PPID" 2>/dev/null
+        ;;
+esac
+
+exit 0
