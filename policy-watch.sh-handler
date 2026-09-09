@@ -1,0 +1,24 @@
+#!/system/bin/sh
+MODDIR="${0%/*}"
+DATA_DIR="/data/adb/pixelfirewall"
+POLICY_FILE="$DATA_DIR/policy.conf"
+SERVICE="$MODDIR/service.sh"
+EVENTS="$1"
+FILE="$2"
+DIRFILE="${3:-}"
+
+case "$FILE" in
+    "$POLICY_FILE")
+        case "$EVENTS" in
+            *w*) exec "$SERVICE" --policy-event ;;
+        esac
+        ;;
+esac
+
+if [ "$DIRFILE" = "policy.conf" ]; then
+    case "$EVENTS" in
+        *m*|*n*) exec "$SERVICE" --policy-event ;;
+    esac
+fi
+
+exit 0
