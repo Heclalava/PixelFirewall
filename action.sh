@@ -1,14 +1,21 @@
 #!/system/bin/sh
-MODDIR=${0%/*}
-
-echo "
-    ____  _____   ________
-   / __ \/  _/ | / / ____/
-  / /_/ // //  |/ / / __  
- / ____// // /|  / /_/ /  
-/_/   /___/_/ |_/\____/   
-                          
-"
-echo "- Refreshing NetBlock rules..."
-sh "$MODDIR/service.sh" &
-echo "- Refresh triggered ✓"
+MODDIR="${0%/*}"
+URL="http://127.0.0.1:8765/"
+echo "- Refreshing PixelFirewall rules..."
+if /system/bin/sh "$MODDIR/service.sh" --refresh >/dev/null 2>&1; then
+    echo "- Firewall refresh ✓"
+else
+    echo "- Firewall refresh failed ✗"
+    exit 1
+fi
+echo "- Starting PixelFirewall web UI..."
+if /system/bin/sh "$MODDIR/webserver.sh"; then
+    echo "- Web server started ✓"
+else
+    echo "- Web server failed ✗"
+    exit 1
+fi
+echo "- Opening PixelFirewall..."
+am start -a android.intent.action.VIEW -d "$URL" >/dev/null 2>&1
+echo "- Browser launch triggered ✓"
+exit 0

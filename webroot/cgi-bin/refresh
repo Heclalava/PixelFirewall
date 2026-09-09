@@ -1,0 +1,10 @@
+#!/system/bin/sh
+echo "Content-Type: application/json"
+echo
+MODDIR="/data/adb/modules/pixelfirewall"
+if /system/bin/sh "$MODDIR/service.sh" --refresh >/dev/null 2>&1; then
+    printf '{"status":"OK","message":"Firewall refreshed"}\n'
+else
+    printf '{"status":"ERROR","message":"Firewall refresh failed"}\n'
+    exit 1
+fi

@@ -1,0 +1,17 @@
+#!/system/bin/sh
+echo "Content-Type: application/json"
+echo
+IPT="/system/bin/iptables"
+IP6T="/system/bin/ip6tables"
+STATE="/data/adb/pixelfirewall/network.state"
+ENGINE="OFF"
+if "$IPT" -C OUTPUT -j PIXELFW >/dev/null 2>&1 && "$IP6T" -C OUTPUT -j PIXELFW >/dev/null 2>&1; then ENGINE="ON"; fi
+W4=0
+W6=0
+MOBILE=0
+if [ -f "$STATE" ]; then
+    grep -q '^WLAN4|' "$STATE" && W4=1
+    grep -q '^WLAN6|' "$STATE" && W6=1
+    MOBILE=$(/system/bin/grep -c '^MOBILE|' "$STATE" 2>/dev/null)
+fi
+printf '{"status":"OK","engine":"%s","ipv4":%s,"ipv6":%s,"mobile_interfaces":%s}\n' "$ENGINE" "$W4" "$W6" "$MOBILE"

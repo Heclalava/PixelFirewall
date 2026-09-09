@@ -1,0 +1,33 @@
+#!/system/bin/sh
+echo "Content-Type: application/json"
+echo
+PM="/system/bin/pm"
+TMP="/data/adb/pixelfirewall/apps.cgi.$$"
+trap 'rm -f "$TMP"' EXIT
+: > "$TMP"
+printf '{"status":"OK","profiles":['
+printf '{"id":"0","name":"Owner"}'
+"$PM" list users 2>/dev/null | /system/bin/sed -n 's/.*UserInfo{\([0-9][0-9]*\):\([^:}]*\):.*/\1|\2/p' | /system/bin/grep -v '^0|' | while IFS='|' read -r id name; do printf ',{"id":"%s","name":"%s"}' "$id" "$name"; done
+printf '],"apps":['
+first=1
+USERS="/data/adb/pixelfirewall/users.cgi.$$"
+"$PM" list users 2>/dev/null | /system/bin/sed -n 's/.*UserInfo{\([0-9][0-9]*\):\([^:}]*\):.*/\1/p' | { printf '%s\n' 0; cat; } | /system/bin/sort -n -u > "$USERS"
+while read -r user; do
+    "$PM" list packages --user "$user" -U 2>/dev/null | /system/bin/sed -n 's/^package:\([^ ]*\)[[:space:]]\+uid:\([0-9][0-9]*\).*/\1|\2/p' | while IFS='|' read -r pkg uid; do
+        case "$uid" in
+            0|1000|1001|2000) continue ;;
+        esac
+        [ -n "$pkg" ] || continue
+        system=false
+        "$PM" list packages --user "$user" -U -s 2>/dev/null | /system/bin/grep -q "^package:${pkg} " && system=true
+        printf '%s|%s|%s|%s\n' "$user" "$uid" "$pkg" "$system"
+    done
+done < "$USERS" > "$TMP"
+rm -f "$USERS"
+while IFS='|' read -r user uid pkg system; do
+    [ -n "$pkg" ] || continue
+    [ "$first" -eq 0 ] && printf ','
+    printf '{"user":"%s","uid":"%s","pkg":"%s","system":%s}' "$user" "$uid" "$pkg" "$system"
+    first=0
+done < "$TMP"
+printf ']}\n'

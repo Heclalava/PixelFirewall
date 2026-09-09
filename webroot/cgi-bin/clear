@@ -1,0 +1,10 @@
+#!/system/bin/sh
+echo "Content-Type: application/json"
+echo
+DATA_DIR="/data/adb/pixelfirewall"
+POLICY="$DATA_DIR/policy.conf"
+TMP="$DATA_DIR/policy.clear.$$"
+: > "$TMP" || { printf '{"status":"ERROR","error":"Cannot create policy"}\n'; exit 1; }
+chmod 600 "$TMP"
+mv -f "$TMP" "$POLICY" || { rm -f "$TMP"; printf '{"status":"ERROR","error":"Cannot clear policy"}\n'; exit 1; }
+printf '{"status":"OK","message":"Policy cleared"}\n'

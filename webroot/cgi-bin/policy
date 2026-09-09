@@ -1,0 +1,64 @@
+#!/system/bin/sh
+echo "Content-Type: application/json"
+echo
+DATA_DIR="/data/adb/pixelfirewall"
+POLICY="$DATA_DIR/policy.conf"
+TMP="$DATA_DIR/policy.cgi.$$"
+BODY="$(cat)"
+
+uid="$(printf '%s' "$BODY" | sed -n 's/.*"uid"[[:space:]]*:[[:space:]]*"\([0-9][0-9]*\)".*/\1/p')"
+network="$(printf '%s' "$BODY" | sed -n 's/.*"network"[[:space:]]*:[[:space:]]*"\([A-Za-z]*\)".*/\1/p')"
+action="$(printf '%s' "$BODY" | sed -n 's/.*"action"[[:space:]]*:[[:space:]]*"\([A-Za-z]*\)".*/\1/p')"
+
+case "$uid" in
+    ''|*[!0-9]*) printf '{"status":"ERROR","error":"Invalid UID"}\n'; exit 1 ;;
+esac
+
+case "$uid" in
+    0|[0-9]|[0-9][0-9]|[0-9][0-9][0-9]|[0-9][0-9][0-9][0-9]|[0-9][0-9][0-9][0-9][0-9]) printf '{"status":"ERROR","error":"Invalid UID"}\n'; exit 1 ;;
+esac
+
+case "$network" in
+    MOBILE|WIFI|LAN) ;;
+    *) printf '{"status":"ERROR","error":"Invalid network"}\n'; exit 1 ;;
+esac
+
+case "$action" in
+    BLOCK|ALLOW) ;;
+    *) printf '{"status":"ERROR","error":"Invalid action"}\n'; exit 1 ;;
+esac
+
+touch "$POLICY" || {
+    printf '{"status":"ERROR","error":"Policy unavailable"}\n'
+    exit 1
+}
+
+chmod 600 "$POLICY"
+
+awk -F '|' -v uid="$uid" -v network="$network" '!($1 == uid && $2 == network && $3 == "BLOCK")' "$POLICY" > "$TMP" || {
+    rm -f "$TMP"
+    printf '{"status":"ERROR","error":"Policy read failed"}\n'
+    exit 1
+}
+
+if [ "$action" = "BLOCK" ]; then
+    printf '%s|%s|BLOCK\n' "$uid" "$network" >> "$TMP"
+fi
+
+sort -u "$TMP" > "${TMP}.sorted" || {
+    rm -f "$TMP" "${TMP}.sorted"
+    printf '{"status":"ERROR","error":"Policy update failed"}\n'
+    exit 1
+}
+
+chmod 600 "${TMP}.sorted"
+
+mv -f "${TMP}.sorted" "$POLICY" || {
+    rm -f "$TMP" "${TMP}.sorted"
+    printf '{"status":"ERROR","error":"Policy update failed"}\n'
+    exit 1
+}
+
+rm -f "$TMP"
+
+printf '{"status":"OK"}\n'

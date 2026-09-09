@@ -448,6 +448,43 @@ apply_policy() {
     return 0
 }
 
+if [ "${1:-}" = "--refresh" ]; then
+    log_msg "=== PixelFirewall Refresh Requested ==="
+    FAILED=0
+    if setup_base_ipv4; then
+        log_msg "IPv4 firewall framework refreshed"
+    else
+        log_msg "ERROR: IPv4 firewall framework refresh failed"
+        FAILED=1
+    fi
+    if setup_base_ipv6; then
+        log_msg "IPv6 firewall framework refreshed"
+    else
+        log_msg "ERROR: IPv6 firewall framework refresh failed"
+        FAILED=1
+    fi
+    rm -f "$STATE_FILE"
+    if apply_dispatcher; then
+        log_msg "Network dispatcher refreshed"
+    else
+        log_msg "ERROR: Network dispatcher refresh failed"
+        FAILED=1
+    fi
+    rm -f "$POLICY_STATE_FILE"
+    if apply_policy; then
+        log_msg "Firewall policy reapplied"
+    else
+        log_msg "ERROR: Firewall policy refresh failed"
+        FAILED=1
+    fi
+    if [ "$FAILED" -eq 0 ]; then
+        log_msg "=== PixelFirewall Refresh Complete ==="
+        exit 0
+    fi
+    log_msg "=== PixelFirewall Refresh Failed ==="
+    exit 1
+fi
+
 if [ "${1:-}" = "--policy-event" ]; then
     apply_policy
     exit $?
