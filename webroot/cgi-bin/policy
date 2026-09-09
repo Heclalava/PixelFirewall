@@ -4,50 +4,74 @@ echo
 DATA_DIR="/data/adb/pixelfirewall"
 POLICY="$DATA_DIR/policy.conf"
 TMP="$DATA_DIR/policy.cgi.$$"
-BODY="$(cat)"
 
-uid="$(printf '%s' "$BODY" | sed -n 's/.*"uid"[[:space:]]*:[[:space:]]*"\([0-9][0-9]*\)".*/\1/p')"
-network="$(printf '%s' "$BODY" | sed -n 's/.*"network"[[:space:]]*:[[:space:]]*"\([A-Za-z]*\)".*/\1/p')"
-action="$(printf '%s' "$BODY" | sed -n 's/.*"action"[[:space:]]*:[[:space:]]*"\([A-Za-z]*\)".*/\1/p')"
+if [ "$REQUEST_METHOD" = "GET" ]; then
+    printf '{"status":"OK","rules":['
+    first=1
+    if [ -f "$POLICY" ]; then
+        while IFS="|" read -r uid network action; do
+            [ -n "$uid" ] || continue
+            [ "$action" = "BLOCK" ] || continue
+            [ "$first" -eq 0 ] && printf ","
+            printf '{"uid":"%s","network":"%s","action":"BLOCK"}' "$uid" "$network"
+            first=0
+        done < "$POLICY"
+    fi
+    printf "]}
+"
+    exit 0
+fi
+
+[ "$REQUEST_METHOD" = "POST" ] || { printf '{"status":"ERROR","error":"Method not allowed"}
+'; exit 1; }
+
+BODY="$(cat)"
+uid="$(printf "%s" "$BODY" | sed -n 's/.*"uid"[[:space:]]*:[[:space:]]*"\([0-9][0-9]*\)".*/\1/p')"
+network="$(printf "%s" "$BODY" | sed -n 's/.*"network"[[:space:]]*:[[:space:]]*"\([A-Za-z]*\)".*/\1/p')"
+action="$(printf "%s" "$BODY" | sed -n 's/.*"action"[[:space:]]*:[[:space:]]*"\([A-Za-z]*\)".*/\1/p')"
 
 case "$uid" in
-    ''|*[!0-9]*) printf '{"status":"ERROR","error":"Invalid UID"}\n'; exit 1 ;;
+    ""|*[!0-9]*) printf '{"status":"ERROR","error":"Invalid UID"}
+'; exit 1 ;;
 esac
 
 case "$uid" in
-    0|[0-9]|[0-9][0-9]|[0-9][0-9][0-9]|[0-9][0-9][0-9][0-9]|[0-9][0-9][0-9][0-9][0-9]) printf '{"status":"ERROR","error":"Invalid UID"}\n'; exit 1 ;;
+    0|[0-9]|[0-9][0-9]|[0-9][0-9][0-9]|[0-9][0-9][0-9][0-9]) printf '{"status":"ERROR","error":"Invalid UID"}
+'; exit 1 ;;
 esac
 
 case "$network" in
     MOBILE|WIFI|LAN) ;;
-    *) printf '{"status":"ERROR","error":"Invalid network"}\n'; exit 1 ;;
+    *) printf '{"status":"ERROR","error":"Invalid network"}
+'; exit 1 ;;
 esac
 
 case "$action" in
     BLOCK|ALLOW) ;;
-    *) printf '{"status":"ERROR","error":"Invalid action"}\n'; exit 1 ;;
+    *) printf '{"status":"ERROR","error":"Invalid action"}
+'; exit 1 ;;
 esac
 
-touch "$POLICY" || {
-    printf '{"status":"ERROR","error":"Policy unavailable"}\n'
-    exit 1
-}
-
+touch "$POLICY" || { printf '{"status":"ERROR","error":"Policy unavailable"}
+'; exit 1; }
 chmod 600 "$POLICY"
 
-awk -F '|' -v uid="$uid" -v network="$network" '!($1 == uid && $2 == network && $3 == "BLOCK")' "$POLICY" > "$TMP" || {
+awk -F "|" -v uid="$uid" -v network="$network" '!($1 == uid && $2 == network && $3 == "BLOCK")' "$POLICY" > "$TMP" || {
     rm -f "$TMP"
-    printf '{"status":"ERROR","error":"Policy read failed"}\n'
+    printf '{"status":"ERROR","error":"Policy read failed"}
+'
     exit 1
 }
 
 if [ "$action" = "BLOCK" ]; then
-    printf '%s|%s|BLOCK\n' "$uid" "$network" >> "$TMP"
+    printf "%s|%s|BLOCK
+" "$uid" "$network" >> "$TMP"
 fi
 
 sort -u "$TMP" > "${TMP}.sorted" || {
     rm -f "$TMP" "${TMP}.sorted"
-    printf '{"status":"ERROR","error":"Policy update failed"}\n'
+    printf '{"status":"ERROR","error":"Policy update failed"}
+'
     exit 1
 }
 
@@ -55,10 +79,10 @@ chmod 600 "${TMP}.sorted"
 
 mv -f "${TMP}.sorted" "$POLICY" || {
     rm -f "$TMP" "${TMP}.sorted"
-    printf '{"status":"ERROR","error":"Policy update failed"}\n'
+    printf '{"status":"ERROR","error":"Policy update failed"}
+'
     exit 1
 }
-
 rm -f "$TMP"
-
-printf '{"status":"OK"}\n'
+printf '{"status":"OK"}
+'
