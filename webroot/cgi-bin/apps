@@ -13,13 +13,13 @@ first=1
 USERS="/data/adb/pixelfirewall/users.cgi.$$"
 "$PM" list users 2>/dev/null | /system/bin/sed -n 's/.*UserInfo{\([0-9][0-9]*\):\([^:}]*\):.*/\1/p' | { printf '%s\n' 0; cat; } | /system/bin/sort -n -u > "$USERS"
 while read -r user; do
-    "$PM" list packages --user "$user" -U 2>/dev/null | /system/bin/sed -n 's/^package:\([^ ]*\)[[:space:]]\+uid:\([0-9][0-9]*\).*/\1|\2/p' | while IFS='|' read -r pkg uid; do
+    "$PM" list packages --user "$user" -U </dev/null 2>/dev/null | /system/bin/awk '/^package:/ {gsub(/^package:/,"",$1); gsub(/^uid:/,"",$2); print $1 "|" $2}' | while IFS='|' read -r pkg uid; do
         case "$uid" in
             0|1000|1001|2000) continue ;;
         esac
         [ -n "$pkg" ] || continue
         system=false
-        "$PM" list packages --user "$user" -U -s 2>/dev/null | /system/bin/grep -q "^package:${pkg} " && system=true
+        "$PM" list packages --user "$user" -U -s </dev/null 2>/dev/null | /system/bin/grep -q "^package:${pkg} " && system=true
         printf '%s|%s|%s|%s\n' "$user" "$uid" "$pkg" "$system"
     done
 done < "$USERS" > "$TMP"
