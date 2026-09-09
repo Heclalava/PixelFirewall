@@ -447,6 +447,11 @@ apply_policy() {
     return 0
 }
 
+if [ "${1:-}" = "--policy-event" ]; then
+    apply_policy
+    exit $?
+fi
+
 log_msg "=== PixelFirewall Activated ==="
 
 sleep 10
@@ -481,8 +486,12 @@ fi
 
 log_msg "=== PixelFirewall Ready (Phase 3, fail-open) ==="
 
+"$MODDIR/policy-watch.sh" "$POLICY_FILE:w" "$DATA_DIR:nm" >/dev/null 2>&1 &
+POLICY_WATCH_PID=$!
+
+trap 'kill "$POLICY_WATCH_PID" 2>/dev/null || true' EXIT INT TERM
+
 while true; do
     sleep "$POLL_INTERVAL"
     apply_dispatcher
-    apply_policy
 done
