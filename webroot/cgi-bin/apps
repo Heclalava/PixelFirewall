@@ -1,33 +1,78 @@
 #!/system/bin/sh
+
 echo "Content-Type: application/json"
 echo
+
 PM="/system/bin/pm"
-TMP="/data/adb/pixelfirewall/apps.cgi.$$"
-trap 'rm -f "$TMP"' EXIT
+BASE="/data/adb/pixelfirewall"
+TMP="$BASE/apps.cgi.$$"
+USERS="$BASE/users.cgi.$$"
+
+trap 'rm -f "$TMP" "$USERS" "$SYS" "$ALL"' EXIT
+
 : > "$TMP"
+
 printf '{"status":"OK","profiles":['
 printf '{"id":"0","name":"Owner"}'
-"$PM" list users 2>/dev/null | /system/bin/sed -n 's/.*UserInfo{\([0-9][0-9]*\):\([^:}]*\):.*/\1|\2/p' | /system/bin/grep -v '^0|' | while IFS='|' read -r id name; do printf ',{"id":"%s","name":"%s"}' "$id" "$name"; done
+
+"$PM" list users 2>/dev/null |
+/system/bin/sed -n 's/.*UserInfo{\([0-9][0-9]*\):\([^:}]*\):.*/\1|\2/p' |
+/system/bin/grep -v '^0|' |
+while IFS='|' read -r id name; do
+    printf ',{"id":"%s","name":"%s"}' "$id" "$name"
+done
+
 printf '],"apps":['
-first=1
-USERS="/data/adb/pixelfirewall/users.cgi.$$"
-"$PM" list users 2>/dev/null | /system/bin/sed -n 's/.*UserInfo{\([0-9][0-9]*\):\([^:}]*\):.*/\1/p' | { printf '%s\n' 0; cat; } | /system/bin/sort -n -u > "$USERS"
+
+"$PM" list users 2>/dev/null |
+/system/bin/sed -n 's/.*UserInfo{\([0-9][0-9]*\):[^:}]*:.*/\1/p' |
+/system/bin/sort -n -u > "$USERS"
+
 while read -r user; do
-    "$PM" list packages --user "$user" -U </dev/null 2>/dev/null | /system/bin/awk '/^package:/ {gsub(/^package:/,"",$1); gsub(/^uid:/,"",$2); print $1 "|" $2}' | while IFS='|' read -r pkg uid; do
-        case "$uid" in
-            0|1000|1001|2000) continue ;;
-        esac
-        [ -n "$pkg" ] || continue
-        system=false
-        "$PM" list packages --user "$user" -U -s </dev/null 2>/dev/null | /system/bin/grep -q "^package:${pkg} " && system=true
-        printf '%s|%s|%s|%s\n' "$user" "$uid" "$pkg" "$system"
-    done
-done < "$USERS" > "$TMP"
-rm -f "$USERS"
+
+    SYS="$BASE/apps-sys.cgi.$$.$user"
+    ALL="$BASE/apps-all.cgi.$$.$user"
+
+    "$PM" list packages --user "$user" -s 2>/dev/null > "$SYS"
+    "$PM" list packages --user "$user" -U 2>/dev/null > "$ALL"
+
+    /system/bin/awk -v user="$user" '
+        NR==FNR {
+            sub(/^package:/, "", $1)
+            if ($1 != "")
+                sys[$1]=1
+            next
+        }
+
+        /^package:/ {
+            sub(/^package:/, "", $1)
+            sub(/^uid:/, "", $2)
+
+            if ($2==0 || $2==1000 || $2==1001 || $2==2000)
+                next
+
+            if ($1 != "")
+                print user "|" $2 "|" $1 "|" (($1 in sys) ? "true" : "false")
+        }
+    ' "$SYS" "$ALL" >> "$TMP"
+
+    rm -f "$SYS" "$ALL"
+
+done < "$USERS"
+
+first=1
+
 while IFS='|' read -r user uid pkg system; do
-    [ -n "$pkg" ] || continue
-    [ "$first" -eq 0 ] && printf ','
-    printf '{"user":"%s","uid":"%s","pkg":"%s","system":%s}' "$user" "$uid" "$pkg" "$system"
+
+    if [ "$first" -eq 0 ]; then
+        printf ','
+    fi
+
+    printf '{"user":"%s","uid":"%s","pkg":"%s","system":%s}' \
+        "$user" "$uid" "$pkg" "$system"
+
     first=0
+
 done < "$TMP"
+
 printf ']}\n'
