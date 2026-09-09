@@ -10,14 +10,14 @@ DIRFILE="${3:-}"
 case "$FILE" in
     "$POLICY_FILE")
         case "$EVENTS" in
-            *w*) exec "$SERVICE" --policy-event ;;
+            *w*) exec /system/bin/sh "$SERVICE" --policy-event ;;
         esac
         ;;
 esac
 
 if [ "$DIRFILE" = "policy.conf" ]; then
     case "$EVENTS" in
-        *m*|*n*) exec "$SERVICE" --policy-event ;;
+        *m*|*n*) exec /system/bin/sh "$SERVICE" --policy-event ;;
     esac
 fi
 
