@@ -1,6 +1,7 @@
 #!/system/bin/sh
 
 MODDIR="${0%/*}"
+chmod 755 "$MODDIR/policy-watch.sh" "$MODDIR/policy-watch.sh-handler"
 DATA_DIR="/data/adb/pixelfirewall"
 LOG_FILE="$DATA_DIR/service.log"
 STATE_FILE="$DATA_DIR/network.state"
