@@ -12,6 +12,14 @@ IPTABLES="/system/bin/iptables"
 IP6TABLES="/system/bin/ip6tables"
 IP="/system/bin/ip"
 
+ipt() {
+    "$IPTABLES" -w 5 "$@"
+}
+
+ip6t() {
+    "$IP6TABLES" -w 5 "$@"
+}
+
 MAIN_CHAIN="PIXELFW"
 MOBILE_CHAIN="PIXELFW-MOBILE"
 WIFI_CHAIN="PIXELFW-WIFI"
@@ -32,15 +40,15 @@ log_msg() {
 }
 
 chain_exists() {
-    "$1" -L "$2" >/dev/null 2>&1
+    "$1" -w 5 -L "$2" >/dev/null 2>&1
 }
 
 remove_all_jumps() {
     TABLE="$1"
     CHAIN="$2"
 
-    while "$TABLE" -C OUTPUT -j "$CHAIN" >/dev/null 2>&1; do
-        "$TABLE" -D OUTPUT -j "$CHAIN" >/dev/null 2>&1 || break
+    while "$TABLE" -w 5 -C OUTPUT -j "$CHAIN" >/dev/null 2>&1; do
+        "$TABLE" -w 5 -D OUTPUT -j "$CHAIN" >/dev/null 2>&1 || break
     done
 }
 
@@ -49,9 +57,9 @@ create_chain() {
     CHAIN="$2"
 
     if chain_exists "$TABLE" "$CHAIN"; then
-        "$TABLE" -F "$CHAIN" || return 1
+        "$TABLE" -w 5 -F "$CHAIN" || return 1
     else
-        "$TABLE" -N "$CHAIN" || return 1
+        "$TABLE" -w 5 -N "$CHAIN" || return 1
     fi
 
     return 0
@@ -61,33 +69,33 @@ setup_base_ipv4() {
     remove_all_jumps "$IPTABLES" "$MAIN_CHAIN"
 
     if ! chain_exists "$IPTABLES" "$MAIN_CHAIN"; then
-        "$IPTABLES" -N "$MAIN_CHAIN" || return 1
+        ipt -N "$MAIN_CHAIN" || return 1
     else
-        "$IPTABLES" -F "$MAIN_CHAIN" || return 1
+        ipt -F "$MAIN_CHAIN" || return 1
     fi
 
     if ! chain_exists "$IPTABLES" "$MOBILE_CHAIN"; then
-        "$IPTABLES" -N "$MOBILE_CHAIN" || return 1
+        ipt -N "$MOBILE_CHAIN" || return 1
     fi
 
     if ! chain_exists "$IPTABLES" "$WIFI_CHAIN"; then
-        "$IPTABLES" -N "$WIFI_CHAIN" || return 1
+        ipt -N "$WIFI_CHAIN" || return 1
     fi
 
     if ! chain_exists "$IPTABLES" "$LAN_CHAIN"; then
-        "$IPTABLES" -N "$LAN_CHAIN" || return 1
+        ipt -N "$LAN_CHAIN" || return 1
     fi
 
-    "$IPTABLES" -F "$MOBILE_CHAIN" || return 1
-    "$IPTABLES" -F "$WIFI_CHAIN" || return 1
-    "$IPTABLES" -F "$LAN_CHAIN" || return 1
+    ipt -F "$MOBILE_CHAIN" || return 1
+    ipt -F "$WIFI_CHAIN" || return 1
+    ipt -F "$LAN_CHAIN" || return 1
 
-    "$IPTABLES" -A "$MOBILE_CHAIN" -j RETURN || return 1
-    "$IPTABLES" -A "$WIFI_CHAIN" -j RETURN || return 1
-    "$IPTABLES" -A "$LAN_CHAIN" -j RETURN || return 1
-    "$IPTABLES" -A "$MAIN_CHAIN" -j RETURN || return 1
+    ipt -A "$MOBILE_CHAIN" -j RETURN || return 1
+    ipt -A "$WIFI_CHAIN" -j RETURN || return 1
+    ipt -A "$LAN_CHAIN" -j RETURN || return 1
+    ipt -A "$MAIN_CHAIN" -j RETURN || return 1
 
-    "$IPTABLES" -I OUTPUT 1 -j "$MAIN_CHAIN" || return 1
+    ipt -I OUTPUT 1 -j "$MAIN_CHAIN" || return 1
 
     return 0
 }
@@ -96,33 +104,33 @@ setup_base_ipv6() {
     remove_all_jumps "$IP6TABLES" "$MAIN_CHAIN"
 
     if ! chain_exists "$IP6TABLES" "$MAIN_CHAIN"; then
-        "$IP6TABLES" -N "$MAIN_CHAIN" || return 1
+        ip6t -N "$MAIN_CHAIN" || return 1
     else
-        "$IP6TABLES" -F "$MAIN_CHAIN" || return 1
+        ip6t -F "$MAIN_CHAIN" || return 1
     fi
 
     if ! chain_exists "$IP6TABLES" "$MOBILE_CHAIN"; then
-        "$IP6TABLES" -N "$MOBILE_CHAIN" || return 1
+        ip6t -N "$MOBILE_CHAIN" || return 1
     fi
 
     if ! chain_exists "$IP6TABLES" "$WIFI_CHAIN"; then
-        "$IP6TABLES" -N "$WIFI_CHAIN" || return 1
+        ip6t -N "$WIFI_CHAIN" || return 1
     fi
 
     if ! chain_exists "$IP6TABLES" "$LAN_CHAIN"; then
-        "$IP6TABLES" -N "$LAN_CHAIN" || return 1
+        ip6t -N "$LAN_CHAIN" || return 1
     fi
 
-    "$IP6TABLES" -F "$MOBILE_CHAIN" || return 1
-    "$IP6TABLES" -F "$WIFI_CHAIN" || return 1
-    "$IP6TABLES" -F "$LAN_CHAIN" || return 1
+    ip6t -F "$MOBILE_CHAIN" || return 1
+    ip6t -F "$WIFI_CHAIN" || return 1
+    ip6t -F "$LAN_CHAIN" || return 1
 
-    "$IP6TABLES" -A "$MOBILE_CHAIN" -j RETURN || return 1
-    "$IP6TABLES" -A "$WIFI_CHAIN" -j RETURN || return 1
-    "$IP6TABLES" -A "$LAN_CHAIN" -j RETURN || return 1
-    "$IP6TABLES" -A "$MAIN_CHAIN" -j RETURN || return 1
+    ip6t -A "$MOBILE_CHAIN" -j RETURN || return 1
+    ip6t -A "$WIFI_CHAIN" -j RETURN || return 1
+    ip6t -A "$LAN_CHAIN" -j RETURN || return 1
+    ip6t -A "$MAIN_CHAIN" -j RETURN || return 1
 
-    "$IP6TABLES" -I OUTPUT 1 -j "$MAIN_CHAIN" || return 1
+    ip6t -I OUTPUT 1 -j "$MAIN_CHAIN" || return 1
 
     return 0
 }
@@ -241,44 +249,44 @@ build_network_state() {
 }
 
 restore_fail_open() {
-    "$IPTABLES" -F "$MAIN_CHAIN" >/dev/null 2>&1
-    "$IP6TABLES" -F "$MAIN_CHAIN" >/dev/null 2>&1
+    ipt -F "$MAIN_CHAIN" >/dev/null 2>&1
+    ip6t -F "$MAIN_CHAIN" >/dev/null 2>&1
 
-    "$IPTABLES" -A "$MAIN_CHAIN" -j RETURN >/dev/null 2>&1
-    "$IP6TABLES" -A "$MAIN_CHAIN" -j RETURN >/dev/null 2>&1
+    ipt -A "$MAIN_CHAIN" -j RETURN >/dev/null 2>&1
+    ip6t -A "$MAIN_CHAIN" -j RETURN >/dev/null 2>&1
 }
 
 rebuild_dispatcher() {
     NEW_STATE="$1"
 
-    "$IPTABLES" -F "$MAIN_CHAIN" || return 1
-    "$IP6TABLES" -F "$MAIN_CHAIN" || return 1
+    ipt -F "$MAIN_CHAIN" || return 1
+    ip6t -F "$MAIN_CHAIN" || return 1
 
     while IFS='|' read -r TYPE VALUE; do
         case "$TYPE" in
             MOBILE)
-                "$IPTABLES" -A "$MAIN_CHAIN" -o "$VALUE" -j "$MOBILE_CHAIN" || return 1
-                "$IP6TABLES" -A "$MAIN_CHAIN" -o "$VALUE" -j "$MOBILE_CHAIN" || return 1
+                ipt -A "$MAIN_CHAIN" -o "$VALUE" -j "$MOBILE_CHAIN" || return 1
+                ip6t -A "$MAIN_CHAIN" -o "$VALUE" -j "$MOBILE_CHAIN" || return 1
                 ;;
             WLAN4)
-                "$IPTABLES" -A "$MAIN_CHAIN" -o wlan0 -d "$VALUE" -j "$LAN_CHAIN" || return 1
+                ipt -A "$MAIN_CHAIN" -o wlan0 -d "$VALUE" -j "$LAN_CHAIN" || return 1
                 ;;
             WLAN6)
-                "$IP6TABLES" -A "$MAIN_CHAIN" -o wlan0 -d "$VALUE" -j "$LAN_CHAIN" || return 1
+                ip6t -A "$MAIN_CHAIN" -o wlan0 -d "$VALUE" -j "$LAN_CHAIN" || return 1
                 ;;
         esac
     done < "$NEW_STATE"
 
     if grep -q '^WLAN4|' "$NEW_STATE"; then
-        "$IPTABLES" -A "$MAIN_CHAIN" -o wlan0 -j "$WIFI_CHAIN" || return 1
+        ipt -A "$MAIN_CHAIN" -o wlan0 -j "$WIFI_CHAIN" || return 1
     fi
 
     if grep -q '^WLAN6|' "$NEW_STATE"; then
-        "$IP6TABLES" -A "$MAIN_CHAIN" -o wlan0 -j "$WIFI_CHAIN" || return 1
+        ip6t -A "$MAIN_CHAIN" -o wlan0 -j "$WIFI_CHAIN" || return 1
     fi
 
-    "$IPTABLES" -A "$MAIN_CHAIN" -j RETURN || return 1
-    "$IP6TABLES" -A "$MAIN_CHAIN" -j RETURN || return 1
+    ipt -A "$MAIN_CHAIN" -j RETURN || return 1
+    ip6t -A "$MAIN_CHAIN" -j RETURN || return 1
 
     return 0
 }
@@ -347,21 +355,21 @@ validate_policy() {
 }
 
 restore_policy_fail_open() {
-    "$IPTABLES" -F "$MOBILE_CHAIN" >/dev/null 2>&1
-    "$IPTABLES" -F "$WIFI_CHAIN" >/dev/null 2>&1
-    "$IPTABLES" -F "$LAN_CHAIN" >/dev/null 2>&1
+    ipt -F "$MOBILE_CHAIN" >/dev/null 2>&1
+    ipt -F "$WIFI_CHAIN" >/dev/null 2>&1
+    ipt -F "$LAN_CHAIN" >/dev/null 2>&1
 
-    "$IP6TABLES" -F "$MOBILE_CHAIN" >/dev/null 2>&1
-    "$IP6TABLES" -F "$WIFI_CHAIN" >/dev/null 2>&1
-    "$IP6TABLES" -F "$LAN_CHAIN" >/dev/null 2>&1
+    ip6t -F "$MOBILE_CHAIN" >/dev/null 2>&1
+    ip6t -F "$WIFI_CHAIN" >/dev/null 2>&1
+    ip6t -F "$LAN_CHAIN" >/dev/null 2>&1
 
-    "$IPTABLES" -A "$MOBILE_CHAIN" -j RETURN >/dev/null 2>&1
-    "$IPTABLES" -A "$WIFI_CHAIN" -j RETURN >/dev/null 2>&1
-    "$IPTABLES" -A "$LAN_CHAIN" -j RETURN >/dev/null 2>&1
+    ipt -A "$MOBILE_CHAIN" -j RETURN >/dev/null 2>&1
+    ipt -A "$WIFI_CHAIN" -j RETURN >/dev/null 2>&1
+    ipt -A "$LAN_CHAIN" -j RETURN >/dev/null 2>&1
 
-    "$IP6TABLES" -A "$MOBILE_CHAIN" -j RETURN >/dev/null 2>&1
-    "$IP6TABLES" -A "$WIFI_CHAIN" -j RETURN >/dev/null 2>&1
-    "$IP6TABLES" -A "$LAN_CHAIN" -j RETURN >/dev/null 2>&1
+    ip6t -A "$MOBILE_CHAIN" -j RETURN >/dev/null 2>&1
+    ip6t -A "$WIFI_CHAIN" -j RETURN >/dev/null 2>&1
+    ip6t -A "$LAN_CHAIN" -j RETURN >/dev/null 2>&1
 }
 
 apply_policy() {
@@ -384,47 +392,47 @@ apply_policy() {
         return 0
     fi
 
-    "$IPTABLES" -F "$MOBILE_CHAIN" || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
-    "$IPTABLES" -F "$WIFI_CHAIN" || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
-    "$IPTABLES" -F "$LAN_CHAIN" || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
+    ipt -F "$MOBILE_CHAIN" || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
+    ipt -F "$WIFI_CHAIN" || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
+    ipt -F "$LAN_CHAIN" || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
 
-    "$IP6TABLES" -F "$MOBILE_CHAIN" || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
-    "$IP6TABLES" -F "$WIFI_CHAIN" || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
-    "$IP6TABLES" -F "$LAN_CHAIN" || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
+    ip6t -F "$MOBILE_CHAIN" || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
+    ip6t -F "$WIFI_CHAIN" || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
+    ip6t -F "$LAN_CHAIN" || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
 
     while IFS='|' read -r UID_VALUE NETWORK ACTION; do
         case "$NETWORK" in
             MOBILE)
-                "$IPTABLES" -A "$MOBILE_CHAIN" -m owner --uid-owner "$UID_VALUE" -j DROP || {
+                ipt -A "$MOBILE_CHAIN" -m owner --uid-owner "$UID_VALUE" -j DROP || {
                     rm -f "$TMP_POLICY"
                     restore_policy_fail_open
                     return 1
                 }
-                "$IP6TABLES" -A "$MOBILE_CHAIN" -m owner --uid-owner "$UID_VALUE" -j DROP || {
+                ip6t -A "$MOBILE_CHAIN" -m owner --uid-owner "$UID_VALUE" -j DROP || {
                     rm -f "$TMP_POLICY"
                     restore_policy_fail_open
                     return 1
                 }
                 ;;
             WIFI)
-                "$IPTABLES" -A "$WIFI_CHAIN" -m owner --uid-owner "$UID_VALUE" -j DROP || {
+                ipt -A "$WIFI_CHAIN" -m owner --uid-owner "$UID_VALUE" -j DROP || {
                     rm -f "$TMP_POLICY"
                     restore_policy_fail_open
                     return 1
                 }
-                "$IP6TABLES" -A "$WIFI_CHAIN" -m owner --uid-owner "$UID_VALUE" -j DROP || {
+                ip6t -A "$WIFI_CHAIN" -m owner --uid-owner "$UID_VALUE" -j DROP || {
                     rm -f "$TMP_POLICY"
                     restore_policy_fail_open
                     return 1
                 }
                 ;;
             LAN)
-                "$IPTABLES" -A "$LAN_CHAIN" -m owner --uid-owner "$UID_VALUE" -j DROP || {
+                ipt -A "$LAN_CHAIN" -m owner --uid-owner "$UID_VALUE" -j DROP || {
                     rm -f "$TMP_POLICY"
                     restore_policy_fail_open
                     return 1
                 }
-                "$IP6TABLES" -A "$LAN_CHAIN" -m owner --uid-owner "$UID_VALUE" -j DROP || {
+                ip6t -A "$LAN_CHAIN" -m owner --uid-owner "$UID_VALUE" -j DROP || {
                     rm -f "$TMP_POLICY"
                     restore_policy_fail_open
                     return 1
@@ -433,13 +441,13 @@ apply_policy() {
         esac
     done < "$TMP_POLICY"
 
-    "$IPTABLES" -A "$MOBILE_CHAIN" -j RETURN || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
-    "$IPTABLES" -A "$WIFI_CHAIN" -j RETURN || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
-    "$IPTABLES" -A "$LAN_CHAIN" -j RETURN || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
+    ipt -A "$MOBILE_CHAIN" -j RETURN || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
+    ipt -A "$WIFI_CHAIN" -j RETURN || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
+    ipt -A "$LAN_CHAIN" -j RETURN || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
 
-    "$IP6TABLES" -A "$MOBILE_CHAIN" -j RETURN || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
-    "$IP6TABLES" -A "$WIFI_CHAIN" -j RETURN || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
-    "$IP6TABLES" -A "$LAN_CHAIN" -j RETURN || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
+    ip6t -A "$MOBILE_CHAIN" -j RETURN || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
+    ip6t -A "$WIFI_CHAIN" -j RETURN || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
+    ip6t -A "$LAN_CHAIN" -j RETURN || { rm -f "$TMP_POLICY"; restore_policy_fail_open; return 1; }
 
     mv -f "$TMP_POLICY" "$POLICY_STATE_FILE"
     chmod 600 "$POLICY_STATE_FILE"
