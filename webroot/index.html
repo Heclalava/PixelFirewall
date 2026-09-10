@@ -236,30 +236,25 @@ async function postPolicy(uid,network,action){
   });
 }
 
-async function refreshFirewall(){
-  return api("/refresh");
+async function applyPolicy(){
+  return api("/policy_refresh");
 }
 
 async function setPolicy(uid,network,blocked){
   const key=String(uid)+"|"+network;
   const action=blocked?"BLOCK":"ALLOW";
 
-  try{
-    await postPolicy(uid,network,action);
+  await postPolicy(uid,network,action);
 
-    if(blocked){
-      policy.set(key,true);
-    }else{
-      policy.delete(key);
-    }
-
-    updateRuleCount();
-    await refreshFirewall();
-    toast("Policy updated");
-  }catch(e){
-    toast("Policy save failed");
-    render();
+  if(blocked){
+    policy.set(key,true);
+  }else{
+    policy.delete(key);
   }
+
+  updateRuleCount();
+  await applyPolicy();
+  toast("Policy updated");
 }
 
 async function loadApps(){
@@ -519,7 +514,7 @@ async function bulkNetwork(n,action){
     updateRuleCount();
     render();
 
-    await refreshFirewall();
+    await applyPolicy();
 
     toast("Policy updated");
   }catch(e){
@@ -695,7 +690,7 @@ async function importBackup(file){
 
     policy=next;
 
-    await refreshFirewall();
+    await applyPolicy();
 
     hideBackup();
     render();
@@ -721,7 +716,7 @@ async function clearAll(){
     policy.clear();
     hideBackup();
     render();
-    await refreshFirewall();
+    await applyPolicy();
     toast("Policy cleared");
   }catch(e){
     toast("Clear failed");

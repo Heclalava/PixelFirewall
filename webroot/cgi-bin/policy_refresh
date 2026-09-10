@@ -1,0 +1,12 @@
+#!/system/bin/sh
+echo "Content-Type: application/json"
+echo
+MODDIR="/data/adb/modules/pixelfirewall"
+if /system/bin/sh "$MODDIR/service.sh" --policy-event >/dev/null 2>&1; then
+    printf '{"status":"OK","message":"Policy applied"}
+'
+else
+    printf '{"status":"ERROR","message":"Policy apply failed"}
+'
+    exit 1
+fi
