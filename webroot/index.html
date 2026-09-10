@@ -236,10 +236,6 @@ async function postPolicy(uid,network,action){
   });
 }
 
-async function applyPolicy(){
-  return api("/policy_refresh");
-}
-
 async function setPolicy(uid,network,blocked){
   const key=String(uid)+"|"+network;
   const action=blocked?"BLOCK":"ALLOW";
@@ -253,7 +249,6 @@ async function setPolicy(uid,network,blocked){
   }
 
   updateRuleCount();
-  await applyPolicy();
   toast("Policy updated");
 }
 
@@ -514,8 +509,6 @@ async function bulkNetwork(n,action){
     updateRuleCount();
     render();
 
-    await applyPolicy();
-
     toast("Policy updated");
   }catch(e){
     toast("Bulk update failed");
@@ -690,8 +683,6 @@ async function importBackup(file){
 
     policy=next;
 
-    await applyPolicy();
-
     hideBackup();
     render();
     toast("Policy imported");
@@ -716,7 +707,6 @@ async function clearAll(){
     policy.clear();
     hideBackup();
     render();
-    await applyPolicy();
     toast("Policy cleared");
   }catch(e){
     toast("Clear failed");

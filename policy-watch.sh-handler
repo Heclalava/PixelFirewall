@@ -2,13 +2,9 @@
 MODDIR="${0%/*}"
 SERVICE="$MODDIR/service.sh"
 
-/system/bin/sh "$SERVICE" --policy-event
+[ "$1" = "y" ] || exit 0
+[ "$3" = "policy.conf" ] || exit 0
 
-PPID_CMDLINE="$(cat "/proc/$PPID/cmdline" 2>/dev/null)"
-case "$PPID_CMDLINE" in
-    *inotifyd*)
-        kill "$PPID" 2>/dev/null
-        ;;
-esac
+/system/bin/sh "$SERVICE" --policy-event
 
 exit 0
