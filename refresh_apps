@@ -6,8 +6,26 @@ CACHE="$DATA_DIR/apps.json"
 TMP="$DATA_DIR/apps.json.$$"
 USERS="$DATA_DIR/users.$$"
 PKGS="$DATA_DIR/packages.$$"
+LABELS="/data/adb/pixelfirewall/labels.conf"
 
 trap 'rm -f "$TMP" "$USERS" "$PKGS" "$DATA_DIR"/systems.*' EXIT
+
+get_label() {
+    pkg="$1"
+
+    if [ -f "$LABELS" ]; then
+        label=$(/system/bin/grep -m1 "^$pkg=" "$LABELS" 2>/dev/null | /system/bin/cut -d= -f2-)
+        if [ -n "$label" ]; then
+            printf "%s" "$label"
+            return
+        fi
+    fi
+
+    tail=${pkg##*.}
+    tail=$(echo "$tail" | tr '_-' '  ')
+    printf "%s" "$(echo "$tail" | cut -c1 | tr '[:lower:]' '[:upper:]')$(echo "$tail" | cut -c2-)"
+}
+
 
 mkdir -p "$DATA_DIR" || exit 1
 
@@ -63,8 +81,10 @@ do
             printf ',' >> "$TMP"
         fi
 
-        printf '{"user":"%s","uid":"%s","pkg":"%s","system":%s}' \
-            "$appuser" "$uid" "$pkg" "$is_system" >> "$TMP"
+        label=$(get_label "$pkg")
+
+        printf '{"user":"%s","uid":"%s","pkg":"%s","name":"%s","system":%s}' \
+            "$appuser" "$uid" "$pkg" "$label" "$is_system" >> "$TMP"
 
         first=0
     done < "$PKGS"

@@ -314,7 +314,7 @@ async function loadApps(){
         uid:uid,
         pkg:pkg,
         system:a.system===true,
-        name:labelFor(pkg),
+        name:a.name||labelFor(pkg),
         profileName:profile?profile.name:("User "+user)
       });
     });
