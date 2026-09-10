@@ -5,33 +5,15 @@ DATA_DIR="/data/adb/pixelfirewall"
 CACHE="$DATA_DIR/apps.json"
 TMP="$DATA_DIR/apps.json.$$"
 USERS="$DATA_DIR/users.$$"
-PKGS="$DATA_DIR/packages.$$"
-LABELS="/data/adb/pixelfirewall/labels.conf"
+LABELS="$DATA_DIR/labels.conf"
 
-trap 'rm -f "$TMP" "$USERS" "$PKGS" "$DATA_DIR"/systems.*' EXIT
-
-get_label() {
-    pkg="$1"
-
-    if [ -f "$LABELS" ]; then
-        label=$(/system/bin/grep -m1 "^$pkg=" "$LABELS" 2>/dev/null | /system/bin/cut -d= -f2-)
-        if [ -n "$label" ]; then
-            printf "%s" "$label"
-            return
-        fi
-    fi
-
-    tail=${pkg##*.}
-    tail=$(echo "$tail" | tr '_-' '  ')
-    printf "%s" "$(echo "$tail" | cut -c1 | tr '[:lower:]' '[:upper:]')$(echo "$tail" | cut -c2-)"
-}
-
+trap 'rm -f "$TMP" "$USERS" "$DATA_DIR"/systems.* "$DATA_DIR"/packages.* "$DATA_DIR"/apps.[0-9]*' EXIT
 
 mkdir -p "$DATA_DIR" || exit 1
 
 "$PM" list users 2>/dev/null |
 /system/bin/sed -n 's/.*UserInfo{\([0-9][0-9]*\):\([^:}]*\):.*/\1|\2/p' |
-/system/bin/sort -t'|' -k1,1n -u > "$USERS"
+/system/bin/sort -t'|' -k1,1n -u > "$USERS" || exit 1
 
 printf '{"status":"OK","profiles":[' > "$TMP"
 
@@ -39,8 +21,11 @@ first=1
 while IFS='|' read -r user name
 do
     [ -z "$user" ] && continue
+
     [ "$first" -eq 0 ] && printf ',' >> "$TMP"
+
     printf '{"id":"%s","name":"%s"}' "$user" "$name" >> "$TMP"
+
     first=0
 done < "$USERS"
 
@@ -48,51 +33,82 @@ printf '],"apps":[' >> "$TMP"
 
 first=1
 
-# Process each Android user independently.
-for user in $(cut -d'|' -f1 "$USERS")
+for user in $(/system/bin/cut -d'|' -f1 "$USERS")
 do
     [ -z "$user" ] && continue
 
     SYSTEMS="$DATA_DIR/systems.$user"
+    PKGS="$DATA_DIR/packages.$user"
+    OUT="$DATA_DIR/apps.$user"
 
     "$PM" list packages -s --user "$user" 2>/dev/null |
-    /system/bin/sed 's/^package://' |
-    /system/bin/sort -u > "$SYSTEMS"
+    /system/bin/sed 's/^package://' > "$SYSTEMS"
 
-    "$PM" list packages --user "$user" -U 2>/dev/null |
-    /system/bin/sed -n "s/^package:\([^ ]*\) uid:\([0-9]*\)$/\1|\2|$user/p" > "$PKGS"
+    "$PM" list packages --user "$user" -U 2>/dev/null | /system/bin/sed -n 's/^package:\([^ ]*\) uid:\([0-9]*\)$/\1|\2/p' | /system/bin/sed "s/$/|$user/" > "$PKGS"
 
-    while IFS='|' read -r pkg uid appuser
-    do
-        [ -z "$pkg" ] && continue
+    /system/bin/awk -F'|' '
+        BEGIN {
+            first = 1
 
-        case "$uid" in
-            0|1000|1001|2000)
-                continue
-                ;;
-        esac
+            while ((getline line < ARGV[3]) > 0) {
+                split(line, a, "=")
+                if (a[1] != "")
+                    label[a[1]] = substr(line, length(a[1]) + 2)
+            }
 
-        is_system=false
-        if /system/bin/grep -Fqx "$pkg" "$SYSTEMS"; then
-            is_system=true
-        fi
+            close(ARGV[3])
+        }
 
+        NR == FNR {
+            sys_pkg[$0] = 1
+            next
+        }
+
+        {
+            pkg = $1
+            uid = $2
+            appuser = $3
+
+            if (uid == "0" || uid == "1000" || uid == "1001" || uid == "2000")
+                next
+
+            if (pkg in sys_pkg)
+                is_system = "true"
+            else
+                is_system = "false"
+
+            if (pkg in label) {
+                name = label[pkg]
+            } else {
+                n = split(pkg, parts, ".")
+                name = parts[n]
+                gsub(/[_-]/, " ", name)
+                name = toupper(substr(name, 1, 1)) substr(name, 2)
+            }
+
+            if (!first)
+                printf ","
+
+            printf "{\"user\":\"%s\",\"uid\":\"%s\",\"pkg\":\"%s\",\"name\":\"%s\",\"system\":%s}", appuser, uid, pkg, name, is_system
+
+            first = 0
+        }
+    ' "$SYSTEMS" "$PKGS" "$LABELS" > "$OUT"
+
+    if [ -s "$OUT" ]; then
         if [ "$first" -eq 0 ]; then
             printf ',' >> "$TMP"
         fi
 
-        label=$(get_label "$pkg")
-
-        printf '{"user":"%s","uid":"%s","pkg":"%s","name":"%s","system":%s}' \
-            "$appuser" "$uid" "$pkg" "$label" "$is_system" >> "$TMP"
-
+        cat "$OUT" >> "$TMP"
         first=0
-    done < "$PKGS"
+    fi
 done
 
 printf ']}\n' >> "$TMP"
 
 mv -f "$TMP" "$CACHE" || exit 1
+
 chmod 644 "$CACHE"
 
 echo "Apps cache refreshed"
