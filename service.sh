@@ -194,7 +194,8 @@ build_network_state() {
         WLAN_UP=$("$IP" -o link show up 2>/dev/null | awk -F': ' '$2=="wlan0" {print "yes"}')
 
         if [ "$WLAN_UP" = "yes" ]; then
-            WLAN4_FOUND=$("$IP" -4 route show dev wlan0 proto kernel scope link 2>/dev/null | awk '$1 ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\/[0-9]+$/ {print $1; exit}')
+            WLAN4_FOUND=$("$IP" -4 route show dev wlan0 proto kernel scope link 2>/dev/null |
+                awk '$1 ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\/[0-9]+$/ {print $1; exit}')
 
             if [ -n "$WLAN4_FOUND" ]; then
                 printf 'WLAN4|%s\n' "$WLAN4_FOUND"
@@ -245,6 +246,56 @@ build_network_state() {
 
         "$IP" -o link show up 2>/dev/null |
             awk -F': ' '$2 ~ /^rmnet[0-9]+$/ {print "MOBILE|" $2}'
+
+        /system/bin/dumpsys connectivity 2>/dev/null |
+            awk '
+            /NetworkAgentInfo\{network\{/ {
+                id=""
+                iface=""
+                underlying=""
+                isvpn=0
+
+                if (match($0,/network\{[0-9]+\}/)) {
+                    x=substr($0,RSTART,RLENGTH)
+                    sub(/^network\{/,"",x)
+                    sub(/\}$/,"",x)
+                    id=x
+                }
+
+                if (match($0,/InterfaceName: [^ ]+/)) {
+                    x=substr($0,RSTART,RLENGTH)
+                    sub(/^InterfaceName: /,"",x)
+                    iface=x
+                }
+
+                if ($0 ~ /ni\{VPN CONNECTED/) {
+                    isvpn=1
+                }
+
+                if (match($0,/underlying\{\[[^]]*\]\}/)) {
+                    x=substr($0,RSTART,RLENGTH)
+                    sub(/^underlying\{\[/,"",x)
+                    sub(/\]\}$/,"",x)
+                    underlying=x
+                }
+
+                if (id != "" && iface != "")
+                    netiface[id]=iface
+
+                if (isvpn && id != "" && iface != "" && underlying != "")
+                    vpn[id]=iface "|" underlying
+            }
+
+            END {
+                for (v in vpn) {
+                    split(vpn[v],a,"|")
+                    split(a[2],u,",")
+                    for (i in u) {
+                        if (u[i] in netiface)
+                            printf "VPN|%s|%s\n",a[1],netiface[u[i]]
+                    }
+                }
+            }'
     } | sort -u
 }
 
@@ -262,7 +313,8 @@ rebuild_dispatcher() {
     ipt -F "$MAIN_CHAIN" || return 1
     ip6t -F "$MAIN_CHAIN" || return 1
 
-    while IFS='|' read -r TYPE VALUE; do
+    # Direct-interface LAN routing.
+    while IFS='|' read -r TYPE VALUE EXTRA; do
         case "$TYPE" in
             MOBILE)
                 ipt -A "$MAIN_CHAIN" -o "$VALUE" -j "$MOBILE_CHAIN" || return 1
@@ -277,6 +329,7 @@ rebuild_dispatcher() {
         esac
     done < "$NEW_STATE"
 
+    # Direct Wi-Fi traffic.
     if grep -q '^WLAN4|' "$NEW_STATE"; then
         ipt -A "$MAIN_CHAIN" -o wlan0 -j "$WIFI_CHAIN" || return 1
     fi
@@ -284,6 +337,42 @@ rebuild_dispatcher() {
     if grep -q '^WLAN6|' "$NEW_STATE"; then
         ip6t -A "$MAIN_CHAIN" -o wlan0 -j "$WIFI_CHAIN" || return 1
     fi
+
+    # VPN traffic inherits the policy of its underlying network.
+    #
+    # LAN destinations are checked before the generic VPN rule.
+    #
+    # VPN interface + WLAN LAN destination -> PIXELFW-LAN
+    # VPN interface + everything else      -> PIXELFW-WIFI
+    #
+    # The VPN interface is discovered dynamically from network.state.
+    while IFS='|' read -r TYPE VPN_IFACE UNDERLYING_IFACE; do
+        [ "$TYPE" = "VPN" ] || continue
+        [ -n "$VPN_IFACE" ] || continue
+        [ -n "$UNDERLYING_IFACE" ] || continue
+
+        case "$UNDERLYING_IFACE" in
+            wlan*)
+                while IFS='|' read -r WLAN_TYPE WLAN_VALUE WLAN_EXTRA; do
+                    case "$WLAN_TYPE" in
+                        WLAN4)
+                            ipt -A "$MAIN_CHAIN" -o "$VPN_IFACE" -d "$WLAN_VALUE" -j "$LAN_CHAIN" || return 1
+                            ;;
+                        WLAN6)
+                            ip6t -A "$MAIN_CHAIN" -o "$VPN_IFACE" -d "$WLAN_VALUE" -j "$LAN_CHAIN" || return 1
+                            ;;
+                    esac
+                done < "$NEW_STATE"
+
+                ipt -A "$MAIN_CHAIN" -o "$VPN_IFACE" -j "$WIFI_CHAIN" || return 1
+                ip6t -A "$MAIN_CHAIN" -o "$VPN_IFACE" -j "$WIFI_CHAIN" || return 1
+                ;;
+            rmnet*)
+                ipt -A "$MAIN_CHAIN" -o "$VPN_IFACE" -j "$MOBILE_CHAIN" || return 1
+                ip6t -A "$MAIN_CHAIN" -o "$VPN_IFACE" -j "$MOBILE_CHAIN" || return 1
+                ;;
+        esac
+    done < "$NEW_STATE"
 
     ipt -A "$MAIN_CHAIN" -j RETURN || return 1
     ip6t -A "$MAIN_CHAIN" -j RETURN || return 1
