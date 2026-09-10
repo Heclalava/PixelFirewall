@@ -543,7 +543,10 @@ log_msg "=== PixelFirewall Ready (Phase 3, fail-open) ==="
 "$MODDIR/policy-watch.sh" "$POLICY_FILE:w" "$DATA_DIR:nm" >/dev/null 2>&1 &
 POLICY_WATCH_PID=$!
 
-trap 'kill "$POLICY_WATCH_PID" 2>/dev/null || true' EXIT INT TERM
+"$MODDIR/app-watch.sh" >/dev/null 2>&1 &
+APP_WATCH_PID=$!
+
+trap 'kill "$POLICY_WATCH_PID" "$APP_WATCH_PID" 2>/dev/null || true' EXIT INT TERM
 
 while true; do
     sleep "$POLL_INTERVAL"
