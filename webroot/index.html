@@ -69,10 +69,10 @@ button{color:inherit}
 .modal{width:100%;max-width:520px;margin:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px}
 .modal h2{font-size:18px;margin:0 0 8px}.modal p{color:var(--muted);font-size:12px;line-height:1.35}
 .modal button{width:100%;height:38px;margin-top:6px;border:1px solid var(--line);background:var(--panel2);border-radius:7px}.modal .danger{color:var(--red)}
-@media(min-width:600px){.header,.toolbar{max-width:760px;margin:auto}.list{max-width:760px;margin-left:auto;margin-right:auto}.footer{max-width:760px;margin:auto}}
 </style>
 </head>
 <body>
+
 <header class="header">
   <div class="header-row">
     <div>
@@ -97,10 +97,15 @@ button{color:inherit}
     <button class="filter" id="fUser" onclick="setAppFilter('user')">USER</button>
     <button class="filter" id="fSystem" onclick="setAppFilter('system')">SYSTEM</button>
   </div>
+
   <div class="select-row">
     <select class="select" id="profileSelect" onchange="setProfile(this.value)"></select>
   </div>
-  <div class="search"><input id="search" type="search" placeholder="Search apps or package" autocomplete="off" oninput="render()"/></div>
+
+  <div class="search">
+    <input id="search" type="search" placeholder="Search apps or package" autocomplete="off" oninput="render()"/>
+  </div>
+
   <div class="bulk">
     <div class="bulk-row">
       <button onclick="bulkNetwork('MOBILE','BLOCK')" class="block">4G BLOCK</button>
@@ -116,8 +121,16 @@ button{color:inherit}
 <main id="list" class="list">
   <div class="loading">Loading PixelFirewall…</div>
 </main>
-<div class="legend"><span><i></i> blocked</span><span><i class="allow"></i> allowed</span><span>tap a cell to change</span></div>
-<div class="footer">PixelFirewall manages only PIXELFW, PIXELFW-MOBILE, PIXELFW-WIFI and PIXELFW-LAN.</div>
+
+<div class="legend">
+  <span><i></i> blocked</span>
+  <span><i class="allow"></i> allowed</span>
+  <span>tap a cell to change</span>
+</div>
+
+<div class="footer">
+  PixelFirewall manages only PIXELFW, PIXELFW-MOBILE, PIXELFW-WIFI and PIXELFW-LAN.
+</div>
 
 <div id="toast" class="toast"></div>
 
@@ -134,133 +147,221 @@ button{color:inherit}
 </div>
 
 <script>
-const DATA="/data/adb/pixelfirewall";
-const POLICY=DATA+"/policy.conf";
-const STATE=DATA+"/network.state";
-let apps=[], profiles=[], policy=new Map(), appFilter="all", selectedProfile="all";
-let writeBusy=false, writeVersion=0, writtenVersion=0;
+const API="/cgi-bin";
 
-function runShell(cmd,cb){
-  const k=window.parent?.ksu||window.ksu;
-  if(!k||!k.exec){cb?.(1,"","ksu unavailable");return}
-  const id="pf_"+Date.now()+"_"+Math.floor(Math.random()*10000);
-  const host=window.parent||window;
-  const timer=setTimeout(()=>{delete host[id];cb?.(1,"","timeout")},7000);
-  host[id]=(code,out,err)=>{clearTimeout(timer);delete host[id];cb?.(code,out||"",err||"")};
-  k.exec(cmd,"{}",id);
-}
-function esc(s){const d=document.createElement("div");d.textContent=s;return d.innerHTML}
-function toast(s){const t=document.getElementById("toast");t.textContent=s;t.classList.add("show");clearTimeout(window.__toast);window.__toast=setTimeout(()=>t.classList.remove("show"),1800)}
-function shellQuote(s){return "'"+String(s).replace(/'/g,"'\\''")+"'"} // only used for fixed/generated policy data
+let apps=[];
+let profiles=[];
+let policy=new Map();
+let appFilter="all";
+let selectedProfile="all";
+let writeBusy=false;
 
-function loadPolicy(done){
-  runShell("cat "+POLICY+" 2>/dev/null",(c,out)=>{
-    policy.clear();
-    if(c===0 && out){
-      out.split(/\r?\n/).forEach(line=>{
-        const p=line.trim().split("|");
-        if(p.length===3 && /^\d+$/.test(p[0]) && ["MOBILE","WIFI","LAN"].includes(p[1]) && p[2]==="BLOCK")
-          policy.set(p[0]+"|"+p[1],true);
-      });
+async function api(path,options={}){
+  const response=await fetch(API+path,{
+    cache:"no-store",
+    credentials:"same-origin",
+    ...options,
+    headers:{
+      "Accept":"application/json",
+      ...(options.headers||{})
     }
-    done?.();
   });
-}
-function writePolicy(){
-  const v=++writeVersion;
-  if(writeBusy)return;
-  writeBusy=true;
-  const rows=Array.from(policy.keys()).sort();
-  const tmp=DATA+"/policy.ui.tmp";
-  let cmd;
-  if(rows.length){
-    const args=rows.map(x=>shellQuote(x+"|BLOCK")).join(" ");
-    cmd="mkdir -p "+DATA+"; printf '%s\\n' "+args+" > "+tmp+" && chmod 600 "+tmp+" && mv -f "+tmp+" "+POLICY;
-  }else{
-    cmd=": > "+tmp+" && chmod 600 "+tmp+" && mv -f "+tmp+" "+POLICY;
-  }
-  runShell(cmd,(c)=>{
-    writeBusy=false;
-    if(c!==0){toast("Policy save failed");return}
-    writtenVersion=v;
-    if(writeVersion!==writtenVersion)writePolicy();
-    else toast("Policy updated");
-  });
-}
-function setPolicy(uid,network,blocked){
-  const key=uid+"|"+network;
-  if(blocked)policy.set(key,true);else policy.delete(key);
-  updateRuleCount();
-  writePolicy();
-}
-function updateRuleCount(){document.getElementById("ruleCount").textContent=policy.size}
 
-function loadProfiles(done){
-  const cmd="printf '0|Owner\\n'; pm list users 2>/dev/null | sed -n 's/.*UserInfo{\\([0-9][0-9]*\\):\\([^:}]*\\):.*/\\1|\\2/p' | grep -v '^0|'";
-  runShell(cmd,(c,out)=>{
-    profiles=[{id:"0",name:"Owner"}];
-    if(c===0&&out)out.trim().split(/\r?\n/).forEach(x=>{
-      const p=x.split("|"); if(p.length===2&&/^\\d+$/.test(p[0])) profiles.push({id:p[0],name:p[1]||("User "+p[0])});
-    });
-    const seen=new Set();profiles=profiles.filter(p=>!seen.has(p.id)&&seen.add(p.id));
-    const s=document.getElementById("profileSelect");
-    s.innerHTML='<option value="all">ALL PROFILES</option>'+profiles.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+' · '+esc(p.id)+'</option>').join("");
-    s.value=selectedProfile;
-    done?.();
-  });
+  const text=await response.text();
+
+  let data;
+  try{
+    data=JSON.parse(text);
+  }catch(e){
+    throw new Error("Invalid server response");
+  }
+
+  if(!response.ok || data.status==="ERROR"){
+    throw new Error(data.error||data.message||("HTTP "+response.status));
+  }
+
+  return data;
 }
-function loadApps(done){
-  document.getElementById("list").innerHTML='<div class="loading">Enumerating apps…</div>';
-  const ids=profiles.map(p=>p.id);
-  if(!ids.length){done?.();return}
-  let outAll="";
-  let left=ids.length;
-  ids.forEach(uid=>{
-    const cmd="echo '##USER|"+uid+"'; pm list packages --user "+uid+" -U 2>/dev/null; echo '##SYSTEM|"+uid+"'; pm list packages --user "+uid+" -U -s 2>/dev/null";
-    runShell(cmd,(c,out)=>{
-      if(c===0&&out)outAll+="\\n"+out;
-      if(--left===0){
-        parseApps(outAll);
-        done?.();
+
+function esc(s){
+  const d=document.createElement("div");
+  d.textContent=String(s);
+  return d.innerHTML;
+}
+
+function toast(s){
+  const t=document.getElementById("toast");
+  t.textContent=s;
+  t.classList.add("show");
+  clearTimeout(window.__toast);
+  window.__toast=setTimeout(()=>t.classList.remove("show"),1800);
+}
+
+function updateRuleCount(){
+  document.getElementById("ruleCount").textContent=policy.size;
+}
+
+async function loadPolicy(){
+  const data=await api("/policy");
+
+  policy.clear();
+
+  if(Array.isArray(data.rules)){
+    data.rules.forEach(r=>{
+      if(
+        r &&
+        /^\d+$/.test(String(r.uid)) &&
+        ["MOBILE","WIFI","LAN"].includes(r.network) &&
+        r.action==="BLOCK"
+      ){
+        policy.set(String(r.uid)+"|"+r.network,true);
       }
     });
+  }
+
+  updateRuleCount();
+}
+
+async function postPolicy(uid,network,action){
+  return api("/policy",{
+    method:"POST",
+    headers:{
+      "Content-Type":"application/json"
+    },
+    body:JSON.stringify({
+      uid:String(uid),
+      network:network,
+      action:action
+    })
   });
 }
-function parseApps(out){
-  const byKey=new Map();
-  let user="0", systemSet=new Set();
-  let section="";
-  out.split(/\r?\n/).forEach(line=>{
-    let m=line.match(/^##USER\\|(\\d+)$/); if(m){user=m[1];section="user";return}
-    m=line.match(/^##SYSTEM\\|(\\d+)$/); if(m){user=m[1];section="system";return}
-    m=line.match(/^package:(\\S+)\\s+uid:(\\d+)/); if(!m)return;
-    const pkg=m[1],uid=m[2];
-    if(section==="system"){systemSet.add(user+"|"+pkg);return}
-    if(section==="user"){
-      if(uid==="0"||uid==="1000"||uid==="1001"||uid==="2000")return;
-      const key=user+"|"+pkg;
-      if(!byKey.has(key))byKey.set(key,{uid,pkg,user,system:false});
+
+async function refreshFirewall(){
+  return api("/refresh");
+}
+
+async function setPolicy(uid,network,blocked){
+  const key=String(uid)+"|"+network;
+  const action=blocked?"BLOCK":"ALLOW";
+
+  try{
+    await postPolicy(uid,network,action);
+
+    if(blocked){
+      policy.set(key,true);
+    }else{
+      policy.delete(key);
     }
-  });
-  byKey.forEach(a=>a.system=systemSet.has(a.user+"|"+a.pkg));
-  apps=Array.from(byKey.values()).map(a=>{
-    const p=profiles.find(x=>x.id===a.user);
-    return {...a,name:labelFor(a.pkg),profileName:p?p.name:("User "+a.user)};
-  });
-  apps.sort((a,b)=>a.name.localeCompare(b.name)||a.pkg.localeCompare(b.pkg));
+
+    updateRuleCount();
+    await refreshFirewall();
+    toast("Policy updated");
+  }catch(e){
+    toast("Policy save failed");
+    render();
+  }
 }
+
+async function loadApps(){
+  document.getElementById("list").innerHTML='<div class="loading">Enumerating apps…</div>';
+
+  const data=await api("/apps");
+
+  profiles=Array.isArray(data.profiles)?data.profiles.map(p=>({
+    id:String(p.id),
+    name:p.name||("User "+p.id)
+  })):[{id:"0",name:"Owner"}];
+
+  const seenProfiles=new Set();
+  profiles=profiles.filter(p=>{
+    if(seenProfiles.has(p.id))return false;
+    seenProfiles.add(p.id);
+    return true;
+  });
+
+  const select=document.getElementById("profileSelect");
+
+  select.innerHTML=
+    '<option value="all">ALL PROFILES</option>'+
+    profiles.map(p=>
+      '<option value="'+esc(p.id)+'">'+
+      esc(p.name)+' · '+esc(p.id)+
+      '</option>'
+    ).join("");
+
+  if(profiles.some(p=>p.id===selectedProfile)){
+    select.value=selectedProfile;
+  }else{
+    selectedProfile="all";
+    select.value="all";
+  }
+
+  apps=[];
+
+  if(Array.isArray(data.apps)){
+    const seenApps=new Set();
+
+    data.apps.forEach(a=>{
+      if(!a || !a.pkg || !/^\d+$/.test(String(a.uid)))return;
+
+      const user=String(a.user);
+      const uid=String(a.uid);
+      const pkg=String(a.pkg);
+      const key=user+"|"+pkg;
+
+      if(seenApps.has(key))return;
+      seenApps.add(key);
+
+      const profile=profiles.find(p=>p.id===user);
+
+      apps.push({
+        user:user,
+        uid:uid,
+        pkg:pkg,
+        system:a.system===true,
+        name:labelFor(pkg),
+        profileName:profile?profile.name:("User "+user)
+      });
+    });
+  }
+
+  apps.sort((a,b)=>
+    a.name.localeCompare(b.name)||
+    a.pkg.localeCompare(b.pkg)
+  );
+}
+
 function labelFor(pkg){
-  const tail=pkg.split(".").pop().replace(/[_-]+/g," ");
-  return tail?tail.charAt(0).toUpperCase()+tail.slice(1):pkg;
+  const tail=String(pkg).split(".").pop().replace(/[_-]+/g," ");
+  return tail
+    ? tail.charAt(0).toUpperCase()+tail.slice(1)
+    : pkg;
 }
+
 function setAppFilter(f){
   appFilter=f;
-  ["All","User","System"].forEach(x=>document.getElementById("f"+x).classList.toggle("active",f===x.toLowerCase()));
+
+  ["All","User","System"].forEach(x=>{
+    document
+      .getElementById("f"+x)
+      .classList.toggle("active",f===x.toLowerCase());
+  });
+
   render();
 }
-function setProfile(v){selectedProfile=v;render()}
+
+function setProfile(v){
+  selectedProfile=v;
+  render();
+}
+
 function visibleApps(){
-  const q=document.getElementById("search").value.trim().toLowerCase();
+  const q=document
+    .getElementById("search")
+    .value
+    .trim()
+    .toLowerCase();
+
   return apps.filter(a=>{
     if(selectedProfile!=="all"&&a.user!==selectedProfile)return false;
     if(appFilter==="user"&&a.system)return false;
@@ -269,102 +370,378 @@ function visibleApps(){
     return true;
   });
 }
-function blocked(uid,n){return policy.has(uid+"|"+n)}
+
+function blocked(uid,n){
+  return policy.has(String(uid)+"|"+n);
+}
+
+function makeIcon(pkg){
+  const text=String(pkg)
+    .split(".")
+    .pop()
+    .replace(/[^A-Za-z0-9]/g,"")
+    .slice(0,2)
+    .toUpperCase()||"PF";
+
+  const svg=
+    '<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50">'+
+    '<rect width="50" height="50" rx="10" fill="#3c3836"/>'+
+    '<text x="25" y="31" text-anchor="middle" font-family="Arial" font-size="15" font-weight="bold" fill="#a89984">'+
+    esc(text)+
+    '</text></svg>';
+
+  return "data:image/svg+xml;charset=UTF-8,"+encodeURIComponent(svg);
+}
+
 function render(){
-  const list=document.getElementById("list"), rows=visibleApps();
+  const list=document.getElementById("list");
+  const rows=visibleApps();
+
   updateRuleCount();
-  if(!rows.length){list.innerHTML='<div class="empty">No matching apps</div>';return}
-  let h='<div class="matrix-head"><div class="apphead">APPLICATION</div><div>4G</div><div>WIFI</div><div>LAN</div></div>';
+
+  if(!rows.length){
+    list.innerHTML='<div class="empty">No matching apps</div>';
+    return;
+  }
+
+  let h=
+    '<div class="matrix-head">'+
+    '<div class="apphead">APPLICATION</div>'+
+    '<div>4G</div>'+
+    '<div>WIFI</div>'+
+    '<div>LAN</div>'+
+    '</div>';
+
   h+=rows.map(a=>{
-    const icon='ksu://icon/'+a.pkg;
-    return '<div class="app-row" data-key="'+esc(a.user+"|"+a.pkg)+'">'+
-      '<div class="app-info"><div class="app-top"><img class="app-icon" src="'+icon+'" onerror="this.style.opacity=.25"><div class="app-name">'+esc(a.name)+'</div></div>'+
-      '<div class="meta">'+esc(a.pkg)+' · <span class="profile">'+esc(a.profileName)+'</span> · UID '+esc(a.uid)+(a.system?' · SYS':'')+'</div></div>'+
+    const icon=makeIcon(a.pkg);
+
+    return(
+      '<div class="app-row" data-key="'+
+      esc(a.user+"|"+a.pkg)+
+      '">'+
+
+      '<div class="app-info">'+
+        '<div class="app-top">'+
+          '<img class="app-icon" src="'+icon+'" alt="">'+
+          '<div class="app-name">'+esc(a.name)+'</div>'+
+        '</div>'+
+
+        '<div class="meta">'+
+          esc(a.pkg)+
+          ' · <span class="profile">'+
+          esc(a.profileName)+
+          '</span> · UID '+
+          esc(a.uid)+
+          (a.system?' · SYS':'')+
+        '</div>'+
+      '</div>'+
+
       cell(a,"MOBILE","4G")+
       cell(a,"WIFI","WIFI")+
       cell(a,"LAN","LAN")+
-      '</div>';
+
+      '</div>'
+    );
   }).join("");
+
   list.innerHTML=h;
 }
+
 function cell(a,n,label){
   const b=blocked(a.uid,n);
-  return '<label class="cell" title="'+label+' '+(b?'blocked':'allowed')+'"><input type="checkbox" '+(b?'checked':'')+' onchange="cellChange(\''+esc(a.uid)+'\',\''+n+'\',this.checked,this)"><span class="dot">'+(b?'×':'·')+'</span></label>';
+
+  return(
+    '<label class="cell" title="'+
+    label+" "+(b?"blocked":"allowed")+
+    '">'+
+
+    '<input type="checkbox" '+
+    (b?"checked":"")+
+    ' onchange="cellChange(\''+
+    esc(a.uid)+
+    '\',\''+
+    n+
+    '\',this.checked,this)">'+
+
+    '<span class="dot">'+
+    (b?"×":"·")+
+    '</span>'+
+
+    '</label>'
+  );
 }
-function cellChange(uid,n,b,el){
-  setPolicy(uid,n,b);
-  const row=el.closest(".app-row");row.classList.add("changed");
-  const dot=el.nextElementSibling;dot.textContent=b?"×":"·";
-  setTimeout(()=>row.classList.remove("changed"),350);
+
+async function cellChange(uid,n,b,el){
+  const row=el.closest(".app-row");
+  const dot=el.nextElementSibling;
+
+  el.disabled=true;
+
+  try{
+    await setPolicy(uid,n,b);
+
+    dot.textContent=b?"×":"·";
+    row.classList.add("changed");
+
+    setTimeout(()=>{
+      row.classList.remove("changed");
+    },350);
+  }finally{
+    el.disabled=false;
+  }
 }
-function bulkNetwork(n,action){
+
+async function bulkNetwork(n,action){
   const rows=visibleApps();
-  if(!rows.length){toast("No matching apps");return}
-  rows.forEach(a=>{const key=a.uid+"|"+n;if(action==="BLOCK")policy.set(key,true);else policy.delete(key)});
-  render();writePolicy();
+
+  if(!rows.length){
+    toast("No matching apps");
+    return;
+  }
+
+  const block=action==="BLOCK";
+
+  toast("Updating "+rows.length+" apps…");
+
+  try{
+    for(const a of rows){
+      await postPolicy(a.uid,n,action);
+
+      const key=String(a.uid)+"|"+n;
+
+      if(block){
+        policy.set(key,true);
+      }else{
+        policy.delete(key);
+      }
+    }
+
+    updateRuleCount();
+    render();
+
+    await refreshFirewall();
+
+    toast("Policy updated");
+  }catch(e){
+    toast("Bulk update failed");
+    await loadPolicy().catch(()=>{});
+    render();
+  }
 }
-function readNetwork(done){
-  runShell("cat "+STATE+" 2>/dev/null",(c,out)=>{
-    const lines=(c===0?out:"").trim().split(/\r?\n/).filter(Boolean);
-    const mobile=lines.filter(x=>x.startsWith("MOBILE|")).map(x=>x.split("|")[1]);
-    const w4=lines.filter(x=>x.startsWith("WLAN4|")).map(x=>x.split("|")[1]);
-    const w6=lines.filter(x=>x.startsWith("WLAN6|")).map(x=>x.split("|")[1]);
-    document.getElementById("ip4").textContent="IPv4 "+(w4.length?"✓":"—");
-    document.getElementById("ip4").className=w4.length?"ok":"warn";
-    document.getElementById("ip6").textContent="IPv6 "+(w6.length?"✓":"—");
-    document.getElementById("ip6").className=w6.length?"ok":"warn";
-    done?.({mobile,w4,w6});
-  });
+
+async function readNetwork(){
+  try{
+    const data=await api("/status");
+
+    const w4=Number(data.ipv4)===1;
+    const w6=Number(data.ipv6)===1;
+
+    document.getElementById("ip4").textContent=
+      "IPv4 "+(w4?"✓":"—");
+
+    document.getElementById("ip4").className=
+      w4?"ok":"warn";
+
+    document.getElementById("ip6").textContent=
+      "IPv6 "+(w6?"✓":"—");
+
+    document.getElementById("ip6").className=
+      w6?"ok":"warn";
+
+    return data;
+  }catch(e){
+    document.getElementById("ip4").textContent="IPv4 —";
+    document.getElementById("ip4").className="warn";
+
+    document.getElementById("ip6").textContent="IPv6 —";
+    document.getElementById("ip6").className="warn";
+
+    throw e;
+  }
 }
-function readEngine(done){
-  const cmd="if /system/bin/iptables -C OUTPUT -j PIXELFW >/dev/null 2>&1 && /system/bin/ip6tables -C OUTPUT -j PIXELFW >/dev/null 2>&1; then echo ON; else echo OFF; fi";
-  runShell(cmd,(c,out)=>{
-    const on=c===0&&out.trim()==="ON";
-    const e=document.getElementById("engine");e.textContent="ENGINE "+(on?"ON":"OFF");e.className=on?"ok":"bad";done?.(on);
-  });
+
+async function readEngine(){
+  try{
+    const data=await api("/status");
+    const on=data.engine==="ON";
+
+    const e=document.getElementById("engine");
+
+    e.textContent="ENGINE "+(on?"ON":"OFF");
+    e.className=on?"ok":"bad";
+
+    return on;
+  }catch(e){
+    const el=document.getElementById("engine");
+    el.textContent="ENGINE ?";
+    el.className="bad";
+    throw e;
+  }
 }
-function refreshAll(){
+
+async function refreshAll(){
   toast("Refreshing…");
-  loadPolicy(()=>loadProfiles(()=>loadApps(()=>{readNetwork(()=>readEngine(()=>render()))})));
+
+  try{
+    await loadPolicy();
+    await loadApps();
+    await readNetwork();
+    await readEngine();
+    render();
+    toast("Refreshed");
+  }catch(e){
+    document.getElementById("list").innerHTML=
+      '<div class="empty">PixelFirewall CGI unavailable</div>';
+    toast("Refresh failed");
+  }
 }
-function showBackup(){document.getElementById("modalBack").classList.add("show")}
-function hideBackup(){document.getElementById("modalBack").classList.remove("show")}
+
+function showBackup(){
+  document.getElementById("modalBack").classList.add("show");
+}
+
+function hideBackup(){
+  document.getElementById("modalBack").classList.remove("show");
+}
+
 function exportBackup(){
-  const data={version:2,type:"PixelFirewall",timestamp:new Date().toISOString(),policy:Array.from(policy.keys()).map(k=>{const p=k.split("|");return {uid:p[0],network:p[1],action:"BLOCK"}})};
-  const file="/sdcard/Download/pixelfirewall-policy-"+new Date().toISOString().slice(0,10)+".json";
-  const content=shellQuote(JSON.stringify(data,null,2));
-  runShell("printf '%s' "+content+" > "+shellQuote(file),(c)=>{if(c===0){hideBackup();toast("Policy exported");}else toast("Export failed")});
-}
-function importBackup(file){
-  if(!file)return;
-  const r=new FileReader();
-  r.onload=()=>{
-    try{
-      const d=JSON.parse(r.result);
-      if(d.type!=="PixelFirewall"||!Array.isArray(d.policy))throw new Error("Invalid backup");
-      const next=new Map();
-      d.policy.forEach(x=>{
-        if(x&&/^\\d+$/.test(String(x.uid))&&["MOBILE","WIFI","LAN"].includes(x.network)&&x.action==="BLOCK")
-          next.set(String(x.uid)+"|"+x.network,true);
-      });
-      policy=next;hideBackup();render();writePolicy();toast("Policy imported");
-    }catch(e){toast("Import failed")};
+  const data={
+    version:2,
+    type:"PixelFirewall",
+    timestamp:new Date().toISOString(),
+    policy:Array.from(policy.keys()).map(k=>{
+      const p=k.split("|");
+      return{
+        uid:p[0],
+        network:p[1],
+        action:"BLOCK"
+      };
+    })
   };
-  r.readAsText(file);
+
+  const blob=new Blob(
+    [JSON.stringify(data,null,2)],
+    {type:"application/json"}
+  );
+
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+
+  a.href=url;
+  a.download=
+    "pixelfirewall-policy-"+
+    new Date().toISOString().slice(0,10)+
+    ".json";
+
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  setTimeout(()=>{
+    URL.revokeObjectURL(url);
+  },1000);
+
+  hideBackup();
+  toast("Policy exported");
+}
+
+async function importBackup(file){
+  if(!file)return;
+
+  try{
+    const text=await file.text();
+    const d=JSON.parse(text);
+
+    if(
+      d.type!=="PixelFirewall"||
+      !Array.isArray(d.policy)
+    ){
+      throw new Error("Invalid backup");
+    }
+
+    const next=new Map();
+
+    d.policy.forEach(x=>{
+      if(
+        x &&
+        /^\d+$/.test(String(x.uid)) &&
+        ["MOBILE","WIFI","LAN"].includes(x.network) &&
+        x.action==="BLOCK"
+      ){
+        next.set(
+          String(x.uid)+"|"+x.network,
+          true
+        );
+      }
+    });
+
+    toast("Importing…");
+
+    const current=policy;
+
+    for(const key of current.keys()){
+      if(!next.has(key)){
+        const p=key.split("|");
+        await postPolicy(p[0],p[1],"ALLOW");
+      }
+    }
+
+    for(const key of next.keys()){
+      if(!current.has(key)){
+        const p=key.split("|");
+        await postPolicy(p[0],p[1],"BLOCK");
+      }
+    }
+
+    policy=next;
+
+    await refreshFirewall();
+
+    hideBackup();
+    render();
+    toast("Policy imported");
+  }catch(e){
+    toast("Import failed");
+  }
+
   document.getElementById("importFile").value="";
 }
-function clearAll(){
-  if(!policy.size){hideBackup();toast("Nothing to clear");return}
+
+async function clearAll(){
+  if(!policy.size){
+    hideBackup();
+    toast("Nothing to clear");
+    return;
+  }
+
   if(!confirm("Clear all PixelFirewall blocks?"))return;
-  policy.clear();hideBackup();render();writePolicy();
-}
-function init(){
+
   try{
-    if(window.kernelsu?.fullScreen)window.kernelsu.fullScreen(true);
-    else if(window.fullScreen)window.fullScreen(true);
-  }catch{}
-  loadPolicy(()=>loadProfiles(()=>loadApps(()=>{readNetwork(()=>readEngine(()=>render()))})));
+    await api("/clear");
+    policy.clear();
+    hideBackup();
+    render();
+    await refreshFirewall();
+    toast("Policy cleared");
+  }catch(e){
+    toast("Clear failed");
+  }
 }
+
+async function init(){
+  try{
+    await loadPolicy();
+    await loadApps();
+    await readNetwork();
+    await readEngine();
+    render();
+  }catch(e){
+    document.getElementById("list").innerHTML=
+      '<div class="empty">Unable to load PixelFirewall</div>';
+    toast("PixelFirewall CGI unavailable");
+  }
+}
+
 init();
 </script>
 </body>

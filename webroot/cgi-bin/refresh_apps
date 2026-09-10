@@ -1,0 +1,78 @@
+#!/system/bin/sh
+
+PM="/system/bin/pm"
+DATA_DIR="/data/adb/pixelfirewall"
+CACHE="$DATA_DIR/apps.json"
+TMP="$DATA_DIR/apps.json.$$"
+USERS="$DATA_DIR/users.$$"
+PKGS="$DATA_DIR/packages.$$"
+
+trap 'rm -f "$TMP" "$USERS" "$PKGS" "$DATA_DIR"/systems.*' EXIT
+
+mkdir -p "$DATA_DIR" || exit 1
+
+"$PM" list users 2>/dev/null |
+/system/bin/sed -n 's/.*UserInfo{\([0-9][0-9]*\):\([^:}]*\):.*/\1|\2/p' |
+/system/bin/sort -t'|' -k1,1n -u > "$USERS"
+
+printf '{"status":"OK","profiles":[' > "$TMP"
+
+first=1
+while IFS='|' read -r user name
+do
+    [ -z "$user" ] && continue
+    [ "$first" -eq 0 ] && printf ',' >> "$TMP"
+    printf '{"id":"%s","name":"%s"}' "$user" "$name" >> "$TMP"
+    first=0
+done < "$USERS"
+
+printf '],"apps":[' >> "$TMP"
+
+first=1
+
+# Process each Android user independently.
+for user in $(cut -d'|' -f1 "$USERS")
+do
+    [ -z "$user" ] && continue
+
+    SYSTEMS="$DATA_DIR/systems.$user"
+
+    "$PM" list packages -s --user "$user" 2>/dev/null |
+    /system/bin/sed 's/^package://' |
+    /system/bin/sort -u > "$SYSTEMS"
+
+    "$PM" list packages --user "$user" -U 2>/dev/null |
+    /system/bin/sed -n "s/^package:\([^ ]*\) uid:\([0-9]*\)$/\1|\2|$user/p" > "$PKGS"
+
+    while IFS='|' read -r pkg uid appuser
+    do
+        [ -z "$pkg" ] && continue
+
+        case "$uid" in
+            0|1000|1001|2000)
+                continue
+                ;;
+        esac
+
+        is_system=false
+        if /system/bin/grep -Fqx "$pkg" "$SYSTEMS"; then
+            is_system=true
+        fi
+
+        if [ "$first" -eq 0 ]; then
+            printf ',' >> "$TMP"
+        fi
+
+        printf '{"user":"%s","uid":"%s","pkg":"%s","system":%s}' \
+            "$appuser" "$uid" "$pkg" "$is_system" >> "$TMP"
+
+        first=0
+    done < "$PKGS"
+done
+
+printf ']}\n' >> "$TMP"
+
+mv -f "$TMP" "$CACHE" || exit 1
+chmod 644 "$CACHE"
+
+echo "Apps cache refreshed"
