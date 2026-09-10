@@ -486,6 +486,14 @@ if [ "${1:-}" = "--refresh" ]; then
         FAILED=1
     fi
     if [ "$FAILED" -eq 0 ]; then
+        if /system/bin/sh "$MODDIR/refresh_apps" >/dev/null 2>&1; then
+            log_msg "Apps cache refreshed"
+        else
+            log_msg "ERROR: Apps cache refresh failed"
+            FAILED=1
+        fi
+    fi
+    if [ "$FAILED" -eq 0 ]; then
         log_msg "=== PixelFirewall Refresh Complete ==="
         exit 0
     fi

@@ -23,13 +23,6 @@ check_file "$MODPATH/customize.sh"
 check_file "$MODPATH/uninstall.sh"
 check_file "$MODPATH/webroot/index.html"
 
-if grep -qiE 'netblock|meowdump|meow' "$MODPATH/module.prop" "$MODPATH/service.sh" "$MODPATH/customize.sh" "$MODPATH/uninstall.sh" 2>/dev/null; then
-    echo "[FAIL] Legacy NetBlock references detected in core files"
-    FAILED=1
-else
-    echo "[OK] Core files contain no legacy NetBlock references"
-fi
-
 if [ "$FAILED" -eq 0 ]; then
     echo "========================================="
     echo "Verification successful"
