@@ -12,11 +12,11 @@
   --yellow:#fabd2f;--blue:#83a598;--orange:#fe8019;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;background:var(--bg);color:var(--text);font-family:"Ubuntu Condensed","Arial Narrow",sans-serif;font-size:14px}
-body{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:"Ubuntu Condensed","Arial Narrow",sans-serif;font-size:14px;height:100%;overflow:hidden}
+body{padding-bottom:calc(14px + env(safe-area-inset-bottom));display:flex;flex-direction:column;height:100vh;overflow:hidden}
 button,input{font:inherit}
 button{color:inherit}
-.header{position:sticky;top:0;z-index:20;background:rgba(40,40,40,.97);border-bottom:1px solid var(--line);padding:10px 12px 8px;padding-top:max(10px,env(safe-area-inset-top))}
+.header{flex:none;position:relative;z-index:50;background:rgba(40,40,40,.97);border-bottom:1px solid var(--line);padding:10px 12px 8px;padding-top:max(10px,env(safe-area-inset-top))}
 .header-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .brand{font-size:22px;font-weight:700;letter-spacing:.02em}
 .brand-dot{color:var(--green)}
@@ -27,7 +27,12 @@ button{color:inherit}
 .statusline{display:flex;gap:9px;flex-wrap:wrap;margin-top:3px;color:var(--muted);font-size:12px}
 .statusline b{font-weight:700;color:var(--text)}
 .ok{color:var(--green)!important}.bad{color:var(--red)!important}.warn{color:var(--yellow)!important}
-.toolbar{padding:8px 10px 6px;border-bottom:1px solid var(--line);background:var(--bg)}
+.toolbar{
+  flex:none;
+  padding:8px 10px 6px;
+  border-bottom:1px solid var(--line);
+  background:var(--bg);
+}
 .filters{display:flex;gap:5px;overflow:auto}
 .filter{flex:1;border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:7px;min-height:32px;font-weight:700;font-size:13px}
 .filter.active{background:var(--orange);border-color:var(--orange);color:#282828}
@@ -39,18 +44,87 @@ button{color:inherit}
 .search::before{content:"⌕";position:absolute;left:10px;top:4px;color:var(--muted);font-size:21px;z-index:1}
 .bulk{margin-top:7px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px}
 .bulk-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px}
-.bulk button{height:28px;border:1px solid var(--line);background:var(--panel2);border-radius:6px;font-weight:700;font-size:12px}
-.bulk button.block{color:var(--red)}.bulk button.allow{color:var(--green)}
-.list{margin:0 8px 12px;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel)}
-.matrix-head,.app-row{display:grid;grid-template-columns:minmax(0,1fr) 54px 54px 54px;align-items:center}
-.matrix-head{min-height:30px;background:var(--panel2);border-bottom:1px solid var(--line);color:var(--muted);font-size:11px;font-weight:700;text-align:center}
+.network-row{
+  display:grid;
+  grid-template-columns:1fr 74px 74px;
+  gap:6px;
+  align-items:center;
+  margin-bottom:6px;
+}
+.network-row:last-child{margin-bottom:0}
+.network-row span{
+  font-size:12px;
+  font-weight:700;
+  color:var(--text);
+}
+.bulk button{
+  height:30px;
+  border:1px solid var(--line);
+  background:linear-gradient(#45403d,#32302f);
+  border-radius:7px;
+  font-weight:700;
+  font-size:11px;
+  box-shadow:inset 0 1px rgba(255,255,255,.08),0 1px 2px rgba(0,0,0,.4);
+}
+.bulk button:active{
+  transform:translateY(1px);
+  box-shadow:inset 0 2px rgba(0,0,0,.25);
+}
+.bulk button.block{color:var(--red)}
+.bulk button.allow{color:var(--green)}
+.list-wrapper{
+  flex:1;
+  min-height:0;
+  margin:7px 8px 12px;
+  display:flex;
+  flex-direction:column;
+}
+
+.list{
+  margin:0;
+  border:1px solid var(--line);
+  border-radius:0 0 8px 8px;
+  background:var(--panel);
+  overflow:hidden;
+  flex:1;
+  min-height:0;
+  display:flex;
+  flex-direction:column;
+}
+
+.matrix-head,.app-row{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 54px 54px 54px;
+  align-items:center;
+}
+
+.matrix-head{
+  position:static;
+  flex:none;
+  min-height:30px;
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-bottom:0;
+  border-radius:8px 8px 0 0;
+  color:var(--muted);
+  font-size:11px;
+  font-weight:700;
+  text-align:center;
+}
 .matrix-head .apphead{text-align:left;padding-left:9px}
+#appRows{
+  flex:1;
+  min-height:0;
+  overflow-y:auto;
+  overflow-x:hidden;
+  overscroll-behavior:contain;
+}
 .app-row{min-height:48px;border-bottom:1px solid var(--line)}
 .app-row:last-child{border-bottom:0}
 .app-info{min-width:0;padding:5px 4px 5px 9px}
 .app-top{display:flex;align-items:center;gap:6px;min-width:0}
 .app-icon{width:25px;height:25px;border-radius:6px;background:var(--panel2);object-fit:cover;flex:0 0 25px}
-.app-name{font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.app-name{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .meta{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
 .profile{color:var(--blue)}
 .cell{height:100%;display:flex;align-items:center;justify-content:center;border-left:1px solid var(--line);cursor:pointer}
@@ -96,6 +170,7 @@ button{color:inherit}
     <button class="filter active" id="fAll" onclick="setAppFilter('all')">ALL</button>
     <button class="filter" id="fUser" onclick="setAppFilter('user')">USER</button>
     <button class="filter" id="fSystem" onclick="setAppFilter('system')">SYSTEM</button>
+    <button class="filter" id="fBlocked" onclick="setAppFilter('blocked')">BLOCKED</button>
   </div>
 
   <div class="select-row">
@@ -107,20 +182,41 @@ button{color:inherit}
   </div>
 
   <div class="bulk">
-    <div class="bulk-row">
-      <button onclick="bulkNetwork('MOBILE','BLOCK')" class="block">4G BLOCK</button>
-      <button onclick="bulkNetwork('WIFI','BLOCK')" class="block">WIFI BLOCK</button>
-      <button onclick="bulkNetwork('LAN','BLOCK')" class="block">LAN BLOCK</button>
-      <button onclick="bulkNetwork('MOBILE','ALLOW')" class="allow">4G ALLOW</button>
-      <button onclick="bulkNetwork('WIFI','ALLOW')" class="allow">WIFI ALLOW</button>
-      <button onclick="bulkNetwork('LAN','ALLOW')" class="allow">LAN ALLOW</button>
+    <div class="network-row">
+      <span>MOBILE DATA</span>
+      <button onclick="bulkNetwork('MOBILE','BLOCK')" class="block">BLOCK</button>
+      <button onclick="bulkNetwork('MOBILE','ALLOW')" class="allow">ALLOW</button>
+    </div>
+    <div class="network-row">
+      <span>WIFI</span>
+      <button onclick="bulkNetwork('WIFI','BLOCK')" class="block">BLOCK</button>
+      <button onclick="bulkNetwork('WIFI','ALLOW')" class="allow">ALLOW</button>
+    </div>
+    <div class="network-row">
+      <span>LAN</span>
+      <button onclick="bulkNetwork('LAN','BLOCK')" class="block">BLOCK</button>
+      <button onclick="bulkNetwork('LAN','ALLOW')" class="allow">ALLOW</button>
     </div>
   </div>
+
 </section>
 
-<main id="list" class="list">
-  <div class="loading">Loading PixelFirewall…</div>
-</main>
+<div class="list-wrapper">
+
+  <div class="matrix-head">
+    <div class="apphead">APPLICATION</div>
+    <div>MOBILE</div>
+    <div>WIFI</div>
+    <div>LAN</div>
+  </div>
+
+  <main id="list" class="list">
+    <div id="appRows">
+      <div class="loading">Loading PixelFirewall…</div>
+    </div>
+  </main>
+
+</div>
 
 <div class="legend">
   <span><i></i> blocked</span>
@@ -253,7 +349,7 @@ async function setPolicy(uid,network,blocked){
 }
 
 async function loadApps(){
-  document.getElementById("list").innerHTML='<div class="loading">Enumerating apps…</div>';
+  document.getElementById("appRows").innerHTML='<div class="loading">Enumerating apps…</div>';
 
   const data=await api("/apps");
 
@@ -331,7 +427,7 @@ function labelFor(pkg){
 function setAppFilter(f){
   appFilter=f;
 
-  ["All","User","System"].forEach(x=>{
+  ["All","User","System","Blocked"].forEach(x=>{
     document
       .getElementById("f"+x)
       .classList.toggle("active",f===x.toLowerCase());
@@ -356,6 +452,8 @@ function visibleApps(){
     if(selectedProfile!=="all"&&a.user!==selectedProfile)return false;
     if(appFilter==="user"&&a.system)return false;
     if(appFilter==="system"&&!a.system)return false;
+    if(appFilter==="blocked" &&
+       !["MOBILE","WIFI","LAN"].some(n=>blocked(a.uid,n)))return false;
     if(q&&!((a.name+" "+a.pkg).toLowerCase().includes(q)))return false;
     return true;
   });
@@ -390,17 +488,11 @@ function render(){
   updateRuleCount();
 
   if(!rows.length){
-    list.innerHTML='<div class="empty">No matching apps</div>';
+    document.getElementById("appRows").innerHTML='<div class="empty">No matching apps</div>';
     return;
   }
 
-  let h=
-    '<div class="matrix-head">'+
-    '<div class="apphead">APPLICATION</div>'+
-    '<div>4G</div>'+
-    '<div>WIFI</div>'+
-    '<div>LAN</div>'+
-    '</div>';
+  let h="";
 
   h+=rows.map(a=>{
     const icon=makeIcon(a.pkg);
@@ -426,7 +518,7 @@ function render(){
         '</div>'+
       '</div>'+
 
-      cell(a,"MOBILE","4G")+
+      cell(a,"MOBILE","MOBILE")+
       cell(a,"WIFI","WIFI")+
       cell(a,"LAN","LAN")+
 
@@ -434,7 +526,8 @@ function render(){
     );
   }).join("");
 
-  list.innerHTML=h;
+  const rowsBox=document.getElementById("appRows");
+  rowsBox.innerHTML=h;
 }
 
 function cell(a,n,label){
