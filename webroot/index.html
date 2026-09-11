@@ -47,7 +47,23 @@ button{color:inherit}
     inset -1px -1px 3px rgba(0,0,0,.45),
     0 2px 4px rgba(0,0,0,.35);
 }
-.icon-btn{width:34px;padding:0}
+.icon-btn{
+  width:34px;
+  padding:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:20px;
+  line-height:1;
+}
+.icon-btn.backup{
+  font-size:16px;
+}
+
+.icon-btn.refresh{
+  font-size:27px;
+  transform:translateY(-1px);
+}
 .icon-btn:active,
 .small-btn:active,
 .filter:active,
@@ -109,13 +125,63 @@ button{color:inherit}
   border:1px solid var(--line);
   background:var(--panel);
   color:var(--text);
-  border-radius:7px;
+  border-radius:8px;
   height:34px;
-  padding:0 7px;
+  padding:0 10px;
   box-shadow:
-    inset 1px 1px 2px rgba(255,255,255,.035),
-    inset -1px -1px 3px rgba(0,0,0,.45),
-    0 2px 4px rgba(0,0,0,.35);
+    inset 1px 1px 3px rgba(255,255,255,.045),
+    inset -2px -2px 4px rgba(0,0,0,.55),
+    0 3px 8px rgba(0,0,0,.45);
+}
+
+.select option{
+  background:var(--panel);
+  color:var(--text);
+}
+
+.custom-select{
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  cursor:pointer;
+}
+
+.select-arrow{
+  color:var(--muted);
+  font-size:11px;
+}
+
+.profile-menu{
+  display:none;
+  position:absolute;
+  left:0;
+  right:0;
+  top:40px;
+  z-index:80;
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:8px;
+  overflow:hidden;
+  box-shadow:
+    inset 1px 1px 3px rgba(255,255,255,.045),
+    inset -2px -2px 4px rgba(0,0,0,.55),
+    0 4px 10px rgba(0,0,0,.55);
+}
+
+.profile-menu.show{
+  display:block;
+}
+
+.profile-item{
+  padding:8px 10px;
+  color:var(--text);
+  font-size:13px;
+}
+
+.profile-item:hover,
+.profile-item.active{
+  background:rgba(235,219,178,.08);
 }
 .search{margin-top:6px;position:relative}
 .search input{
@@ -374,11 +440,61 @@ button{color:inherit}
 }
 .toast{position:fixed;left:50%;bottom:20px;transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;z-index:100;color:var(--text);transition:opacity .12s,transform .12s}
 .toast.show{opacity:1;transform:translate(-50%,0)}
-.modal-back{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:flex-end;z-index:40}
-.modal-back.show{display:flex}
-.modal{width:100%;max-width:520px;margin:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px}
-.modal h2{font-size:18px;margin:0 0 8px}.modal p{color:var(--muted);font-size:12px;line-height:1.35}
-.modal button{width:100%;height:38px;margin-top:6px;border:1px solid var(--line);background:var(--panel2);border-radius:7px}.modal .danger{color:var(--red)}
+.modal-back{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.65);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:16px;
+  z-index:100;
+}
+
+.modal-back.show{
+  display:flex;
+}
+
+.modal{
+  width:100%;
+  max-width:420px;
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:14px;
+  box-shadow:
+    inset 1px 1px 3px rgba(255,255,255,.045),
+    inset -2px -2px 4px rgba(0,0,0,.55),
+    0 6px 14px rgba(0,0,0,.6);
+}
+
+.modal h2{
+  font-size:18px;
+  margin:0 0 8px;
+}
+
+.modal p{
+  color:var(--muted);
+  font-size:12px;
+  line-height:1.35;
+}
+
+.modal button{
+  width:100%;
+  height:38px;
+  margin-top:6px;
+  border:1px solid var(--line);
+  background:var(--panel2);
+  border-radius:7px;
+  box-shadow:
+    inset 1px 1px 2px rgba(255,255,255,.035),
+    inset -1px -1px 3px rgba(0,0,0,.45),
+    0 2px 4px rgba(0,0,0,.35);
+}
+
+.modal .danger{
+  color:var(--red);
+}
 </style>
 </head>
 <body>
@@ -394,8 +510,8 @@ button{color:inherit}
       </div>
     </div>
     <div class="header-actions">
-      <button class="icon-btn" onclick="refreshAll()" title="Refresh">↻</button>
-      <button class="icon-btn" onclick="showBackup()" title="Backup">⇅</button>
+      <button class="icon-btn refresh" onclick="refreshAll()" title="Refresh">↻</button>
+      <button class="icon-btn backup" onclick="showBackup()" title="Backup">⇅</button>
     </div>
   </div>
 </header>
@@ -409,7 +525,11 @@ button{color:inherit}
   </div>
 
   <div class="select-row">
-    <select class="select" id="profileSelect" onchange="setProfile(this.value)"></select>
+    <div class="select custom-select" id="profileSelect">
+      <span id="profileLabel">ALL PROFILES</span>
+      <span class="select-arrow">▼</span>
+      <div id="profileMenu" class="profile-menu"></div>
+    </div>
   </div>
 
   <div class="search">
@@ -602,21 +722,26 @@ async function loadApps(){
     return true;
   });
 
-  const select=document.getElementById("profileSelect");
+  const label=document.getElementById("profileLabel");
+  const menu=document.getElementById("profileMenu");
 
-  select.innerHTML=
-    '<option value="all">ALL PROFILES</option>'+
+  menu.innerHTML=
+    '<div class="profile-item" onclick="setProfile(\'all\')">ALL PROFILES</div>'+
     profiles.map(p=>
-      '<option value="'+esc(p.id)+'">'+
+      '<div class="profile-item" onclick="setProfile(\''+
+      esc(p.id)+
+      '\')">'+
       esc(p.name)+' · '+esc(p.id)+
-      '</option>'
+      '</div>'
     ).join("");
 
-  if(profiles.some(p=>p.id===selectedProfile)){
-    select.value=selectedProfile;
+  const current=profiles.find(p=>p.id===selectedProfile);
+
+  if(current){
+    label.textContent=current.name+" · "+current.id;
   }else{
     selectedProfile="all";
-    select.value="all";
+    label.textContent="ALL PROFILES";
   }
 
   apps=[];
@@ -675,8 +800,34 @@ function setAppFilter(f){
 
 function setProfile(v){
   selectedProfile=v;
+
+  const label=document.getElementById("profileLabel");
+  const menu=document.getElementById("profileMenu");
+
+  if(v==="all"){
+    label.textContent="ALL PROFILES";
+  }else{
+    const p=profiles.find(x=>x.id===v);
+    label.textContent=p?(p.name+" · "+p.id):"User "+v;
+  }
+
+  menu.classList.remove("show");
   render();
 }
+
+document.addEventListener("click",e=>{
+  const box=document.getElementById("profileSelect");
+  const menu=document.getElementById("profileMenu");
+
+  if(!box||!menu)return;
+
+  if(box.contains(e.target)){
+    if(e.target.closest(".profile-item"))return;
+    menu.classList.toggle("show");
+  }else{
+    menu.classList.remove("show");
+  }
+});
 
 function visibleApps(){
   const q=document
