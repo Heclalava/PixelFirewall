@@ -573,17 +573,29 @@ async function cellChange(uid,n,b,el){
   const row=el.closest(".app-row");
   const dot=el.nextElementSibling;
 
+  const scrollBox=document.getElementById("appRows");
+  const scrollPos=scrollBox.scrollTop;
+
   el.disabled=true;
 
   try{
     await setPolicy(uid,n,b);
 
-    dot.textContent=b?"×":"·";
+    dot.textContent=b?"":"";
+    dot.parentElement.title=
+      n+" "+(b?"blocked":"allowed");
+
     row.classList.add("changed");
 
     setTimeout(()=>{
       row.classList.remove("changed");
     },350);
+
+    scrollBox.scrollTop=scrollPos;
+
+  }catch(e){
+    toast("Policy update failed");
+    el.checked=!b;
   }finally{
     el.disabled=false;
   }
