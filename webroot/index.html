@@ -9,7 +9,7 @@
 :root{
   --bg:#282828;--panel:#32302f;--panel2:#3c3836;--line:#504945;
   --text:#ebdbb2;--muted:#a89984;--green:#b8bb26;--red:#fb4934;
-  --yellow:#fabd2f;--blue:#83a598;--orange:#fe8019;
+  --yellow:#fabd2f;--blue:#83a598;--orange:#fe8019;--engine-green:#8ec07c;--allow-green:#8ec07c;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--text);font-family:"Ubuntu Condensed","Arial Narrow",sans-serif;font-size:14px;height:100%;height:100dvh;overflow:hidden}
@@ -17,10 +17,10 @@ body{padding-bottom:0;display:flex;flex-direction:column;height:100%;height:100d
 button,input{font:inherit}
 button{color:inherit}
 .header{flex:none;position:relative;z-index:50;background:rgba(40,40,40,.97);border-bottom:1px solid var(--line);padding:10px 12px 8px;padding-top:max(10px,env(safe-area-inset-top))}
-.header-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.header-row{display:flex;align-items:center;justify-content:space-between;gap:10px}.header-row>div:first-child{min-width:0}
 .brand{font-size:22px;font-weight:700;letter-spacing:.02em}
 .brand-dot{color:var(--green)}
-.header-actions{display:flex;gap:6px}
+.header-actions{display:flex;gap:6px;flex:none}
 .icon-btn,.small-btn{
   border:1px solid var(--line);
   background:var(--panel);
@@ -42,9 +42,15 @@ button{color:inherit}
   box-shadow:
     inset 1px 2px 3px rgba(0,0,0,.35);
 }
-.statusline{display:flex;gap:9px;flex-wrap:wrap;margin-top:3px;color:var(--muted);font-size:12px}
-.statusline b{font-weight:700;color:var(--text)}
-.ok{color:var(--green)!important}.bad{color:var(--red)!important}.warn{color:var(--yellow)!important}
+.statusline{display:flex;gap:9px;flex-wrap:nowrap;white-space:nowrap;margin-top:3px;color:var(--muted);font-size:12px}
+.statusline b{
+  font-weight:700;
+  color:var(--muted);
+}
+.statusline b.blocked-count{
+  color:var(--red);
+}
+.statusline .ok{color:var(--engine-green)!important}.statusline .bad{color:var(--red)!important}.statusline .warn{color:var(--yellow)!important}
 .toolbar{
   flex:none;
   padding:8px 10px 6px;
@@ -153,7 +159,7 @@ button{color:inherit}
   box-shadow:inset 0 2px rgba(0,0,0,.25);
 }
 .bulk button.block{color:var(--red)}
-.bulk button.allow{color:var(--green)}
+.bulk button.allow{color:var(--allow-green)}
 .list-wrapper{
   flex:1;
   min-height:0;
@@ -347,11 +353,10 @@ button{color:inherit}
 <header class="header">
   <div class="header-row">
     <div>
-      <div class="brand">PIXELFIREWALL <span class="brand-dot">●</span></div>
+      <div class="brand">PIXELFIREWALL</div>
       <div class="statusline">
         <span id="engine">ENGINE …</span>
-        <span id="ip4">IPv4 …</span>
-        <span id="ip6">IPv6 …</span>
+        <span>•</span>
         <span><b id="ruleCount">0</b> blocked</span>
       </div>
     </div>
@@ -491,7 +496,9 @@ function toast(s){
 }
 
 function updateRuleCount(){
-  document.getElementById("ruleCount").textContent=policy.size;
+  const el=document.getElementById("ruleCount");
+  el.textContent=policy.size;
+  el.classList.toggle("blocked-count",policy.size>0);
 }
 
 async function loadPolicy(){
@@ -803,30 +810,8 @@ async function bulkNetwork(n,action){
 async function readNetwork(){
   try{
     const data=await api("/status");
-
-    const w4=Number(data.ipv4)===1;
-    const w6=Number(data.ipv6)===1;
-
-    document.getElementById("ip4").textContent=
-      "IPv4 "+(w4?"✓":"—");
-
-    document.getElementById("ip4").className=
-      w4?"ok":"warn";
-
-    document.getElementById("ip6").textContent=
-      "IPv6 "+(w6?"✓":"—");
-
-    document.getElementById("ip6").className=
-      w6?"ok":"warn";
-
     return data;
   }catch(e){
-    document.getElementById("ip4").textContent="IPv4 —";
-    document.getElementById("ip4").className="warn";
-
-    document.getElementById("ip6").textContent="IPv6 —";
-    document.getElementById("ip6").className="warn";
-
     throw e;
   }
 }
@@ -839,7 +824,7 @@ async function readEngine(){
     const e=document.getElementById("engine");
 
     e.textContent="ENGINE "+(on?"ON":"OFF");
-    e.className=on?"ok":"bad";
+    e.classList.remove("ok","bad"); e.classList.add(on?"ok":"bad");
 
     return on;
   }catch(e){
@@ -1004,8 +989,9 @@ async function init(){
     await readEngine();
     render();
   }catch(e){
+    console.error("PixelFirewall init failed:",e);
     document.getElementById("list").innerHTML=
-      '<div class="empty">Unable to load PixelFirewall</div>';
+      '<div class="empty">'+String(e)+'</div>';
     toast("PixelFirewall CGI unavailable");
   }
 }
