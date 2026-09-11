@@ -121,16 +121,37 @@ button{color:inherit}
 }
 .app-row{min-height:48px;border-bottom:1px solid var(--line)}
 .app-row:last-child{border-bottom:1px solid var(--line)}
-.app-info{min-width:0;padding:5px 4px 5px 9px}
-.app-top{display:flex;align-items:center;gap:6px;min-width:0}
+.app-info{min-width:0;flex:1;padding:5px 4px 5px 9px}
+.app-top{display:block;min-width:0}
 
 .app-name{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .meta{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
 .profile{color:var(--blue)}
 .cell{height:100%;display:flex;align-items:center;justify-content:center;border-left:1px solid var(--line);cursor:pointer}
 .cell input{position:absolute;opacity:0;pointer-events:none}
-.dot{width:25px;height:25px;border-radius:6px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--muted);background:var(--panel2)}
-.cell input:checked + .dot{background:rgba(251,73,52,.18);border-color:var(--red);color:var(--red)}
+.dot{
+  width:18px;
+  overflow:hidden;
+  text-indent:-9999px;
+  height:18px;
+  border-radius:6px;
+  border:1px solid var(--line);
+  background:var(--panel);
+  box-shadow:
+    inset 1px 1px 2px rgba(255,255,255,.04),
+    inset -1px -1px 2px rgba(0,0,0,.45),
+    0 1px 2px rgba(0,0,0,.35);
+  transition:.15s ease;
+}
+
+.cell input:checked + .dot{
+  background:rgba(251,73,52,.10);
+  border-color:rgba(251,73,52,.55);
+  box-shadow:
+    inset 1px 1px 2px rgba(255,255,255,.04),
+    inset -1px -1px 2px rgba(0,0,0,.45),
+    0 0 4px rgba(251,73,52,.35);
+}
 .app-row.changed{background:rgba(254,128,25,.04)}
 .legend{
   flex:none;
