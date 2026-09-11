@@ -10,6 +10,8 @@ POLICY_STATE_FILE="$DATA_DIR/policy.applied"
 
 IPTABLES="/system/bin/iptables"
 IP6TABLES="/system/bin/ip6tables"
+IPTABLES_RESTORE="/system/bin/iptables-restore"
+IP6TABLES_RESTORE="/system/bin/ip6tables-restore"
 IP="/system/bin/ip"
 
 ipt() {
@@ -18,6 +20,16 @@ ipt() {
 
 ip6t() {
     "$IP6TABLES" -w 5 "$@"
+}
+
+ensure_output_hook() {
+    remove_all_jumps "$IPTABLES" "$MAIN_CHAIN"
+    ipt -C OUTPUT -j "$MAIN_CHAIN" 2>/dev/null || ipt -I OUTPUT 1 -j "$MAIN_CHAIN" || return 1
+
+    remove_all_jumps "$IP6TABLES" "$MAIN_CHAIN"
+    ip6t -C OUTPUT -j "$MAIN_CHAIN" 2>/dev/null || ip6t -I OUTPUT 1 -j "$MAIN_CHAIN" || return 1
+
+    return 0
 }
 
 MAIN_CHAIN="PIXELFW"
@@ -66,7 +78,6 @@ create_chain() {
 }
 
 setup_base_ipv4() {
-    remove_all_jumps "$IPTABLES" "$MAIN_CHAIN"
 
     if ! chain_exists "$IPTABLES" "$MAIN_CHAIN"; then
         ipt -N "$MAIN_CHAIN" || return 1
@@ -95,13 +106,12 @@ setup_base_ipv4() {
     ipt -A "$LAN_CHAIN" -j RETURN || return 1
     ipt -A "$MAIN_CHAIN" -j RETURN || return 1
 
-    ipt -I OUTPUT 1 -j "$MAIN_CHAIN" || return 1
+    ipt -C OUTPUT -j "$MAIN_CHAIN" 2>/dev/null || ipt -I OUTPUT 1 -j "$MAIN_CHAIN" || return 1
 
     return 0
 }
 
 setup_base_ipv6() {
-    remove_all_jumps "$IP6TABLES" "$MAIN_CHAIN"
 
     if ! chain_exists "$IP6TABLES" "$MAIN_CHAIN"; then
         ip6t -N "$MAIN_CHAIN" || return 1
@@ -130,7 +140,7 @@ setup_base_ipv6() {
     ip6t -A "$LAN_CHAIN" -j RETURN || return 1
     ip6t -A "$MAIN_CHAIN" -j RETURN || return 1
 
-    ip6t -I OUTPUT 1 -j "$MAIN_CHAIN" || return 1
+    ip6t -C OUTPUT -j "$MAIN_CHAIN" 2>/dev/null || ip6t -I OUTPUT 1 -j "$MAIN_CHAIN" || return 1
 
     return 0
 }
@@ -310,74 +320,118 @@ restore_fail_open() {
 rebuild_dispatcher() {
     NEW_STATE="$1"
 
-    ipt -F "$MAIN_CHAIN" || return 1
-    ip6t -F "$MAIN_CHAIN" || return 1
+    IPT_TMP="$DATA_DIR/iptables.restore.$$"
+    IP6T_TMP="$DATA_DIR/ip6tables.restore.$$"
 
-    # Direct-interface LAN routing.
-    while IFS='|' read -r TYPE VALUE EXTRA; do
-        case "$TYPE" in
-            MOBILE)
-                ipt -A "$MAIN_CHAIN" -o "$VALUE" -j "$MOBILE_CHAIN" || return 1
-                ip6t -A "$MAIN_CHAIN" -o "$VALUE" -j "$MOBILE_CHAIN" || return 1
-                ;;
-            WLAN4)
-                ipt -A "$MAIN_CHAIN" -o wlan0 -d "$VALUE" -j "$LAN_CHAIN" || return 1
-                ;;
-            WLAN6)
-                ip6t -A "$MAIN_CHAIN" -o wlan0 -d "$VALUE" -j "$LAN_CHAIN" || return 1
-                ;;
-        esac
-    done < "$NEW_STATE"
+    {
+        echo "*filter"
+        echo ":$MAIN_CHAIN - [0:0]"
+        echo ":$MOBILE_CHAIN - [0:0]"
+        echo ":$WIFI_CHAIN - [0:0]"
+        echo ":$LAN_CHAIN - [0:0]"
 
-    # Direct Wi-Fi traffic.
-    if grep -q '^WLAN4|' "$NEW_STATE"; then
-        ipt -A "$MAIN_CHAIN" -o wlan0 -j "$WIFI_CHAIN" || return 1
+        while IFS='|' read -r TYPE VALUE EXTRA; do
+            case "$TYPE" in
+                MOBILE)
+                    echo "-A $MAIN_CHAIN -o $VALUE -j $MOBILE_CHAIN"
+                    ;;
+                WLAN4)
+                    echo "-A $MAIN_CHAIN -d $VALUE -o wlan0 -j $LAN_CHAIN"
+                    echo "-A $MAIN_CHAIN -d $VALUE -o wlan0 -j RETURN"
+                    ;;
+            esac
+        done < "$NEW_STATE"
+
+        if grep -q '^WLAN4|' "$NEW_STATE"; then
+            echo "-A $MAIN_CHAIN -o wlan0 -j $WIFI_CHAIN"
+        fi
+
+        while IFS='|' read -r TYPE VPN_IFACE UNDERLYING_IFACE; do
+            [ "$TYPE" = "VPN" ] || continue
+            [ -n "$VPN_IFACE" ] || continue
+            [ -n "$UNDERLYING_IFACE" ] || continue
+
+            case "$UNDERLYING_IFACE" in
+                wlan*)
+                    while IFS='|' read -r WLAN_TYPE WLAN_VALUE WLAN_EXTRA; do
+                        [ "$WLAN_TYPE" = "WLAN4" ] || continue
+                        echo "-A $MAIN_CHAIN -o $VPN_IFACE -d $WLAN_VALUE -j $LAN_CHAIN"
+                        echo "-A $MAIN_CHAIN -o $VPN_IFACE -d $WLAN_VALUE -j RETURN"
+                    done < "$NEW_STATE"
+
+                    echo "-A $MAIN_CHAIN -o $VPN_IFACE -j $WIFI_CHAIN"
+                    ;;
+                rmnet*)
+                    echo "-A $MAIN_CHAIN -o $VPN_IFACE -j $MOBILE_CHAIN"
+                    ;;
+            esac
+        done < "$NEW_STATE"
+
+        echo "-A $MAIN_CHAIN -j RETURN"
+        echo "COMMIT"
+    } > "$IPT_TMP"
+
+
+    {
+        echo "*filter"
+        echo ":$MAIN_CHAIN - [0:0]"
+        echo ":$MOBILE_CHAIN - [0:0]"
+        echo ":$WIFI_CHAIN - [0:0]"
+        echo ":$LAN_CHAIN - [0:0]"
+
+        while IFS='|' read -r TYPE VALUE EXTRA; do
+            case "$TYPE" in
+                MOBILE)
+                    echo "-A $MAIN_CHAIN -o $VALUE -j $MOBILE_CHAIN"
+                    ;;
+                WLAN6)
+                    echo "-A $MAIN_CHAIN -d $VALUE -o wlan0 -j $LAN_CHAIN"
+                    echo "-A $MAIN_CHAIN -d $VALUE -o wlan0 -j RETURN"
+                    ;;
+            esac
+        done < "$NEW_STATE"
+
+        if grep -q '^WLAN6|' "$NEW_STATE"; then
+            echo "-A $MAIN_CHAIN -o wlan0 -j $WIFI_CHAIN"
+        fi
+
+        while IFS='|' read -r TYPE VPN_IFACE UNDERLYING_IFACE; do
+            [ "$TYPE" = "VPN" ] || continue
+            [ -n "$VPN_IFACE" ] || continue
+            [ -n "$UNDERLYING_IFACE" ] || continue
+
+            case "$UNDERLYING_IFACE" in
+                wlan*)
+                    while IFS='|' read -r WLAN_TYPE WLAN_VALUE WLAN_EXTRA; do
+                        [ "$WLAN_TYPE" = "WLAN6" ] || continue
+                        echo "-A $MAIN_CHAIN -o $VPN_IFACE -d $WLAN_VALUE -j $LAN_CHAIN"
+                        echo "-A $MAIN_CHAIN -o $VPN_IFACE -d $WLAN_VALUE -j RETURN"
+                    done < "$NEW_STATE"
+
+                    echo "-A $MAIN_CHAIN -o $VPN_IFACE -j $WIFI_CHAIN"
+                    ;;
+                rmnet*)
+                    echo "-A $MAIN_CHAIN -o $VPN_IFACE -j $MOBILE_CHAIN"
+                    ;;
+            esac
+        done < "$NEW_STATE"
+
+        echo "-A $MAIN_CHAIN -j RETURN"
+        echo "COMMIT"
+    } > "$IP6T_TMP"
+
+
+    if "$IPTABLES_RESTORE" -w 5 < "$IPT_TMP" &&
+       "$IP6TABLES_RESTORE" -w 5 < "$IP6T_TMP"; then
+
+        if ensure_output_hook; then
+            rm -f "$IPT_TMP" "$IP6T_TMP"
+            return 0
+        fi
     fi
 
-    if grep -q '^WLAN6|' "$NEW_STATE"; then
-        ip6t -A "$MAIN_CHAIN" -o wlan0 -j "$WIFI_CHAIN" || return 1
-    fi
-
-    # VPN traffic inherits the policy of its underlying network.
-    #
-    # LAN destinations are checked before the generic VPN rule.
-    #
-    # VPN interface + WLAN LAN destination -> PIXELFW-LAN
-    # VPN interface + everything else      -> PIXELFW-WIFI
-    #
-    # The VPN interface is discovered dynamically from network.state.
-    while IFS='|' read -r TYPE VPN_IFACE UNDERLYING_IFACE; do
-        [ "$TYPE" = "VPN" ] || continue
-        [ -n "$VPN_IFACE" ] || continue
-        [ -n "$UNDERLYING_IFACE" ] || continue
-
-        case "$UNDERLYING_IFACE" in
-            wlan*)
-                while IFS='|' read -r WLAN_TYPE WLAN_VALUE WLAN_EXTRA; do
-                    case "$WLAN_TYPE" in
-                        WLAN4)
-                            ipt -A "$MAIN_CHAIN" -o "$VPN_IFACE" -d "$WLAN_VALUE" -j "$LAN_CHAIN" || return 1
-                            ;;
-                        WLAN6)
-                            ip6t -A "$MAIN_CHAIN" -o "$VPN_IFACE" -d "$WLAN_VALUE" -j "$LAN_CHAIN" || return 1
-                            ;;
-                    esac
-                done < "$NEW_STATE"
-
-                ipt -A "$MAIN_CHAIN" -o "$VPN_IFACE" -j "$WIFI_CHAIN" || return 1
-                ip6t -A "$MAIN_CHAIN" -o "$VPN_IFACE" -j "$WIFI_CHAIN" || return 1
-                ;;
-            rmnet*)
-                ipt -A "$MAIN_CHAIN" -o "$VPN_IFACE" -j "$MOBILE_CHAIN" || return 1
-                ip6t -A "$MAIN_CHAIN" -o "$VPN_IFACE" -j "$MOBILE_CHAIN" || return 1
-                ;;
-        esac
-    done < "$NEW_STATE"
-
-    ipt -A "$MAIN_CHAIN" -j RETURN || return 1
-    ip6t -A "$MAIN_CHAIN" -j RETURN || return 1
-
-    return 0
+    rm -f "$IPT_TMP" "$IP6T_TMP"
+    return 1
 }
 
 apply_dispatcher() {
