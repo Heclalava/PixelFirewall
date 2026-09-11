@@ -123,7 +123,7 @@ button{color:inherit}
 .app-row:last-child{border-bottom:1px solid var(--line)}
 .app-info{min-width:0;padding:5px 4px 5px 9px}
 .app-top{display:flex;align-items:center;gap:6px;min-width:0}
-.app-icon{width:25px;height:25px;border-radius:6px;background:var(--panel2);object-fit:cover;flex:0 0 25px}
+
 .app-name{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .meta{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
 .profile{color:var(--blue)}
@@ -478,24 +478,6 @@ function blocked(uid,n){
   return policy.has(String(uid)+"|"+n);
 }
 
-function makeIcon(pkg){
-  const text=String(pkg)
-    .split(".")
-    .pop()
-    .replace(/[^A-Za-z0-9]/g,"")
-    .slice(0,2)
-    .toUpperCase()||"PF";
-
-  const svg=
-    '<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50">'+
-    '<rect width="50" height="50" rx="10" fill="#3c3836"/>'+
-    '<text x="25" y="31" text-anchor="middle" font-family="Arial" font-size="15" font-weight="bold" fill="#a89984">'+
-    esc(text)+
-    '</text></svg>';
-
-  return "data:image/svg+xml;charset=UTF-8,"+encodeURIComponent(svg);
-}
-
 function render(){
   const list=document.getElementById("list");
   const rows=visibleApps();
@@ -510,7 +492,6 @@ function render(){
   let h="";
 
   h+=rows.map(a=>{
-    const icon=makeIcon(a.pkg);
 
     return(
       '<div class="app-row" data-key="'+
@@ -519,7 +500,7 @@ function render(){
 
       '<div class="app-info">'+
         '<div class="app-top">'+
-          '<img class="app-icon" src="'+icon+'" alt="">'+
+
           '<div class="app-name">'+esc(a.name)+'</div>'+
         '</div>'+
 
