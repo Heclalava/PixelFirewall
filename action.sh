@@ -1,6 +1,6 @@
 #!/system/bin/sh
 MODDIR="${0%/*}"
-URL="http://127.0.0.1:8765/"
+URL="http://127.0.0.1:8765/index.html"
 echo "- Refreshing PixelFirewall rules..."
 if /system/bin/sh "$MODDIR/service.sh" --refresh >/dev/null 2>&1; then
     echo "- Firewall refresh ✓"

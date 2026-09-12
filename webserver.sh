@@ -17,7 +17,7 @@ rm -f "$PIDFILE"
 
 cd "$MODDIR/webroot" || exit 1
 
-"$HTTPD" httpd -p 127.0.0.1:$PORT -h "$MODDIR/webroot" >"$LOGFILE" 2>&1 &
+"$HTTPD" httpd -p 127.0.0.1:$PORT -h "$MODDIR/webroot" -c "$MODDIR/webroot/httpd.conf" >"$LOGFILE" 2>&1 &
 
 sleep 1
 
