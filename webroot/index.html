@@ -597,6 +597,15 @@ button{color:inherit}
   </div>
 </div>
 
+<div id="clearConfirmBack" class="modal-back" onclick="if(event.target===this)hideClearConfirm()">
+  <div class="modal">
+    <h2>Clear all PixelFirewall blocks?</h2>
+    <p>This will remove all PixelFirewall policy rules. No Android firewall chains are modified by this operation.</p>
+    <button class="danger" onclick="confirmClearAll()">Clear all blocks</button>
+    <button onclick="hideClearConfirm()">Cancel</button>
+  </div>
+</div>
+
 <script>
 const API="/cgi-bin";
 
@@ -1152,8 +1161,19 @@ async function clearAll(){
     return;
   }
 
-  if(!confirm("Clear all PixelFirewall blocks?"))return;
+  showClearConfirm();
+}
 
+function showClearConfirm(){
+  document.getElementById("clearConfirmBack").style.display="flex";
+}
+
+function hideClearConfirm(){
+  document.getElementById("clearConfirmBack").style.display="none";
+}
+
+async function confirmClearAll(){
+  hideClearConfirm();
   try{
     await api("/clear");
     policy.clear();

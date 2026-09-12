@@ -287,6 +287,11 @@ build_network_state() {
                     sub(/^underlying\{\[/,"",x)
                     sub(/\]\}$/,"",x)
                     underlying=x
+                } else if (match($0,/UnderlyingNetworks: \[[^]]*\]/)) {
+                    x=substr($0,RSTART,RLENGTH)
+                    sub(/^UnderlyingNetworks: \[/,"",x)
+                    sub(/\]$/,"",x)
+                    underlying=x
                 }
 
                 if (id != "" && iface != "")
@@ -446,8 +451,17 @@ apply_dispatcher() {
 
     if rebuild_dispatcher "$TMP_STATE"; then
         mv -f "$TMP_STATE" "$STATE_FILE"
-        log_msg "Network dispatcher updated"
-        return 0
+
+        rm -f "$POLICY_STATE_FILE"
+        if apply_policy; then
+            log_msg "Network dispatcher updated"
+            log_msg "Firewall policy reapplied after dispatcher update"
+            return 0
+        fi
+
+        log_msg "ERROR: Firewall policy reapply failed after dispatcher update"
+        restore_fail_open
+        return 1
     fi
 
     rm -f "$TMP_STATE"
