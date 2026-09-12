@@ -1073,41 +1073,37 @@ function hideBackup(){
 
 function exportBackup(){
   const data={
-    version:2,
+    version:3,
     type:"PixelFirewall",
     timestamp:new Date().toISOString(),
     policy:Array.from(policy.keys()).map(k=>{
       const p=k.split("|");
+      const uid=p[0];
+      const network=p[1];
+      const app=apps.find(a=>String(a.uid)===uid);
       return{
-        uid:p[0],
-        network:p[1],
-        action:"BLOCK"
+        uid:uid,
+        network:network,
+        action:"BLOCK",
+        app:app?{
+          name:app.name,
+          pkg:app.pkg,
+          user:app.user,
+          profile:app.profileName,
+          system:app.system
+        }:null
       };
     })
   };
-
-  const blob=new Blob(
-    [JSON.stringify(data,null,2)],
-    {type:"application/json"}
-  );
-
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
   const url=URL.createObjectURL(blob);
   const a=document.createElement("a");
-
   a.href=url;
-  a.download=
-    "pixelfirewall-policy-"+
-    new Date().toISOString().slice(0,10)+
-    ".json";
-
+  a.download="pixelfirewall-policy-"+new Date().toISOString().slice(0,10)+".json";
   document.body.appendChild(a);
   a.click();
   a.remove();
-
-  setTimeout(()=>{
-    URL.revokeObjectURL(url);
-  },1000);
-
+  setTimeout(()=>{URL.revokeObjectURL(url)},1000);
   hideBackup();
   toast("Policy exported");
 }
