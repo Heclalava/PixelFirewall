@@ -1,3 +1,7 @@
+## Preview
+
+![PixelFirewall WebUI](Screenshot.png)
+
 # PixelFirewall
 
 PixelFirewall is a rooted Android firewall module for controlling
