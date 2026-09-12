@@ -1,11 +1,16 @@
 #!/system/bin/sh
 
-MODDIR="${0%/*}"
+MODDIR="$MODPATH"
 DATA_DIR="/data/adb/pixelfirewall"
 INSTALL_LOG="$DATA_DIR/installation.log"
 
 mkdir -p "$DATA_DIR"
 chmod 700 "$DATA_DIR"
+
+if [ -f "$MODDIR/data/labels.conf" ]; then
+    cp -f "$MODDIR/data/labels.conf" "$DATA_DIR/labels.conf"
+    chmod 600 "$DATA_DIR/labels.conf"
+fi
 
 log_msg() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$INSTALL_LOG"
@@ -38,11 +43,8 @@ log_msg "========================================="
 
 
 
-if [ -f "$MODDIR/uninstall.sh" ]; then
-    chmod 755 "$MODDIR/uninstall.sh"
-fi
-
-chmod 755 "$MODDIR/policy-watch.sh" "$MODDIR/policy-watch.sh-handler"
+chmod 755 "$MODDIR/action.sh" "$MODDIR/app-watch.sh" "$MODDIR/customize.sh" "$MODDIR/policy-watch.sh" "$MODDIR/policy-watch.sh-handler" "$MODDIR/post-fs-data.sh" "$MODDIR/refresh_apps" "$MODDIR/service.sh" "$MODDIR/uninstall.sh" "$MODDIR/verify.sh" "$MODDIR/webserver.sh" "$MODDIR/webserver-start.sh"
+chmod 755 "$MODDIR/webroot/cgi-bin/apps" "$MODDIR/webroot/cgi-bin/clear" "$MODDIR/webroot/cgi-bin/policy" "$MODDIR/webroot/cgi-bin/policy_refresh" "$MODDIR/webroot/cgi-bin/refresh" "$MODDIR/webroot/cgi-bin/status"
 
 touch "$DATA_DIR/blocked_uids.txt"
 chmod 600 "$DATA_DIR/blocked_uids.txt"

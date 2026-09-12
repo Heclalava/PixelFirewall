@@ -699,20 +699,28 @@ async function postPolicy(uid,network,action){
 }
 
 async function setPolicy(uid,network,blocked){
-  const key=String(uid)+"|"+network;
-  const action=blocked?"BLOCK":"ALLOW";
+  if(writeBusy)return;
 
-  await postPolicy(uid,network,action);
+  writeBusy=true;
 
-  if(blocked){
-    policy.set(key,true);
-  }else{
-    policy.delete(key);
+  try{
+    const key=String(uid)+"|"+network;
+    const action=blocked?"BLOCK":"ALLOW";
+
+    await postPolicy(uid,network,action);
+
+    if(blocked){
+      policy.set(key,true);
+    }else{
+      policy.delete(key);
+    }
+
+    updateRuleCount();
+    policySignature=getPolicySignature();
+    toast("Policy updated");
+  }finally{
+    writeBusy=false;
   }
-
-  updateRuleCount();
-  policySignature=getPolicySignature();
-  toast("Policy updated");
 }
 
 async function loadApps(){
@@ -975,6 +983,12 @@ async function bulkNetwork(n,action){
 
   const block=action==="BLOCK";
 
+  if(writeBusy){
+    toast("Policy update in progress");
+    return;
+  }
+
+  writeBusy=true;
   toast("Updating "+rows.length+" apps…");
 
   try{
@@ -999,6 +1013,8 @@ async function bulkNetwork(n,action){
     toast("Bulk update failed");
     await loadPolicy().catch(()=>{});
     render();
+  }finally{
+    writeBusy=false;
   }
 }
 
@@ -1126,6 +1142,12 @@ async function importBackup(file){
       }
     });
 
+    if(writeBusy){
+      toast("Policy update in progress");
+      return;
+    }
+
+    writeBusy=true;
     toast("Importing…");
 
     const current=policy;
@@ -1152,6 +1174,8 @@ async function importBackup(file){
     toast("Policy imported");
   }catch(e){
     toast("Import failed");
+  }finally{
+    writeBusy=false;
   }
 
   document.getElementById("importFile").value="";
@@ -1177,6 +1201,14 @@ function hideClearConfirm(){
 
 async function confirmClearAll(){
   hideClearConfirm();
+
+  if(writeBusy){
+    toast("Policy update in progress");
+    return;
+  }
+
+  writeBusy=true;
+
   try{
     await api("/clear");
     policy.clear();
@@ -1186,6 +1218,8 @@ async function confirmClearAll(){
     toast("Policy cleared");
   }catch(e){
     toast("Clear failed");
+  }finally{
+    writeBusy=false;
   }
 }
 
@@ -1212,7 +1246,7 @@ function getPolicySignature(){
 }
 
 async function refreshPolicy(force=false){
-  if(policyRefreshBusy || document.visibilityState!=="visible") return;
+  if(policyRefreshBusy || writeBusy || document.visibilityState!=="visible") return;
   policyRefreshBusy=true;
   try{
     const before=policySignature;

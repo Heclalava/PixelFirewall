@@ -6,8 +6,10 @@ CACHE="$DATA_DIR/apps.json"
 TMP="$DATA_DIR/apps.json.$$"
 USERS="$DATA_DIR/users.$$"
 LABELS="$DATA_DIR/labels.conf"
+APK_LABEL="/data/adb/modules/pixelfirewall/apklabel"
+APK_LABELS="$DATA_DIR/apklabels.$$"
 
-trap 'rm -f "$TMP" "$USERS" "$DATA_DIR"/systems.* "$DATA_DIR"/packages.* "$DATA_DIR"/apps.[0-9]*' EXIT
+trap 'rm -f "$TMP" "$USERS" "$APK_LABELS" "$DATA_DIR"/systems.* "$DATA_DIR"/packages.* "$DATA_DIR"/apps.[0-9]*' EXIT
 
 mkdir -p "$DATA_DIR" || exit 1
 
@@ -33,6 +35,8 @@ printf '],"apps":[' >> "$TMP"
 
 first=1
 
+: > "$APK_LABELS"
+
 for user in $(/system/bin/cut -d'|' -f1 "$USERS")
 do
     [ -z "$user" ] && continue
@@ -44,19 +48,56 @@ do
     "$PM" list packages -s --user "$user" 2>/dev/null |
     /system/bin/sed 's/^package://' > "$SYSTEMS"
 
-    "$PM" list packages --user "$user" -U 2>/dev/null | /system/bin/sed -n 's/^package:\([^ ]*\) uid:\([0-9]*\)$/\1|\2/p' | /system/bin/sed "s/$/|$user/" > "$PKGS"
+    "$PM" list packages --user "$user" -U 2>/dev/null |
+    /system/bin/sed -n 's/^package:\([^ ]*\) uid:\([0-9]*\)$/\1|\2/p' |
+    /system/bin/sed "s/$/|$user/" > "$PKGS"
+
+    while IFS='|' read -r pkg uid appuser
+    do
+        [ -z "$pkg" ] && continue
+
+        case "$uid" in
+            0|1000|1001|2000) continue ;;
+        esac
+
+        apk=$("$PM" path "$pkg" 2>/dev/null |
+            /system/bin/sed -n 's/^package:\(.*\/base\.apk\)$/\1/p' |
+            /system/bin/head -n 1)
+
+        [ -z "$apk" ] && continue
+
+        if [ -x "$APK_LABEL" ]; then
+            name=$("$APK_LABEL" "$apk" 2>/dev/null)
+            case "$name" in
+                *"
+"*|*"	"*) name="" ;;
+            esac
+
+            if [ -n "$name" ]; then
+                printf '%s|%s\n' "$pkg" "$name" >> "$APK_LABELS"
+            fi
+        fi
+    done < "$PKGS"
 
     /system/bin/awk -F'|' '
         BEGIN {
-            first = 1
-
             while ((getline line < ARGV[3]) > 0) {
                 split(line, a, "=")
                 if (a[1] != "")
-                    label[a[1]] = substr(line, length(a[1]) + 2)
+                    override[a[1]] = substr(line, length(a[1]) + 2)
             }
-
             close(ARGV[3])
+            delete ARGV[3]
+
+            while ((getline line < ARGV[4]) > 0) {
+                split(line, a, "|")
+                if (a[1] != "" && a[2] != "")
+                    apklabel[a[1]] = a[2]
+            }
+            close(ARGV[4])
+            delete ARGV[4]
+
+            first = 1
         }
 
         NR == FNR {
@@ -77,14 +118,37 @@ do
             else
                 is_system = "false"
 
-            if (pkg in label) {
-                name = label[pkg]
+            if (pkg in override) {
+                name = override[pkg]
+            } else if (pkg in apklabel) {
+                name = apklabel[pkg]
             } else {
                 n = split(pkg, parts, ".")
-                name = parts[n]
-                gsub(/[_-]/, " ", name)
-                name = toupper(substr(name, 1, 1)) substr(name, 2)
+                name = ""
+
+                for (i = 2; i <= n; i++) {
+                    part = parts[i]
+
+                    if (part == "android" || part == "google" || part == "com" || part == "org" || part == "net" || part == "app")
+                        continue
+
+                    gsub(/[_-]/, " ", part)
+                    part = toupper(substr(part, 1, 1)) substr(part, 2)
+
+                    if (name == "")
+                        name = part
+                    else
+                        name = name " " part
+                }
+
+                if (name == "")
+                    name = pkg
             }
+
+            gsub(/\\/,"\\\\",pkg)
+            gsub(/"/,"\\\"",pkg)
+            gsub(/\\/,"\\\\",name)
+            gsub(/"/,"\\\"",name)
 
             if (!first)
                 printf ","
@@ -93,7 +157,7 @@ do
 
             first = 0
         }
-    ' "$SYSTEMS" "$PKGS" "$LABELS" > "$OUT"
+    ' "$SYSTEMS" "$PKGS" "$LABELS" "$APK_LABELS" > "$OUT"
 
     if [ -s "$OUT" ]; then
         if [ "$first" -eq 0 ]; then
