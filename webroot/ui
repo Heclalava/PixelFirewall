@@ -4,6 +4,7 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
 <meta name="theme-color" content="#282828"/>
+<link rel="manifest" href="/manifest.json"/>
 <title>PixelFirewall</title>
 <style>
 :root{
@@ -12,8 +13,8 @@
   --yellow:#fabd2f;--blue:#83a598;--orange:#fe8019;--engine-green:#8ec07c;--allow-green:#8ec07c;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;background:var(--bg);color:var(--text);font-family:"Ubuntu Condensed","Arial Narrow",sans-serif;font-size:14px;height:100%;height:100dvh;overflow:hidden}
-body{padding-bottom:0;display:flex;flex-direction:column;height:100%;height:100dvh;overflow:hidden}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:"Ubuntu Condensed","Arial Narrow",sans-serif;font-size:14px;height:100%;overflow:hidden}
+body{padding-bottom:env(safe-area-inset-bottom);display:flex;flex-direction:column;height:100%;overflow:hidden}
 button,input{font:inherit}
 button{color:inherit}
 .header{
@@ -1099,7 +1100,7 @@ function exportBackup(){
   const url=URL.createObjectURL(blob);
   const a=document.createElement("a");
   a.href=url;
-  a.download="pixelfirewall-policy-"+new Date().toISOString().slice(0,10)+".json";
+  a.download="pixelfirewall-policy-"+(()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")+"-"+String(d.getHours()).padStart(2,"0")+String(d.getMinutes()).padStart(2,"0")})()+".json";
   document.body.appendChild(a);
   a.click();
   a.remove();
