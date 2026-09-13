@@ -43,7 +43,7 @@ log_msg "========================================="
 
 
 
-chmod 755 "$MODDIR/action.sh" "$MODDIR/app-watch.sh" "$MODDIR/customize.sh" "$MODDIR/policy-watch.sh" "$MODDIR/policy-watch.sh-handler" "$MODDIR/post-fs-data.sh" "$MODDIR/refresh_apps" "$MODDIR/service.sh" "$MODDIR/uninstall.sh" "$MODDIR/verify.sh" "$MODDIR/webserver.sh" "$MODDIR/webserver-start.sh"
+chmod 755 "$MODDIR/action.sh" "$MODDIR/app-watch.sh" "$MODDIR/apklabel" "$MODDIR/customize.sh" "$MODDIR/policy-watch.sh" "$MODDIR/policy-watch.sh-handler" "$MODDIR/post-fs-data.sh" "$MODDIR/refresh_apps" "$MODDIR/service.sh" "$MODDIR/uninstall.sh" "$MODDIR/verify.sh" "$MODDIR/webserver.sh" "$MODDIR/webserver-start.sh"
 chmod 755 "$MODDIR/webroot/cgi-bin/apps" "$MODDIR/webroot/cgi-bin/clear" "$MODDIR/webroot/cgi-bin/policy" "$MODDIR/webroot/cgi-bin/policy_refresh" "$MODDIR/webroot/cgi-bin/refresh" "$MODDIR/webroot/cgi-bin/status"
 
 touch "$DATA_DIR/blocked_uids.txt"
