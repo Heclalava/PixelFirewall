@@ -479,7 +479,7 @@ policy_line_valid() {
         ''|*[!0-9]*) return 1 ;;
     esac
 
-    [ "$UID_VALUE" -gt 0 ] 2>/dev/null || return 1
+    [ "$UID_VALUE" -ge 1 ] 2>/dev/null && [ "$UID_VALUE" -le 2147483647 ] 2>/dev/null || return 1
 
     case "$NETWORK" in
         MOBILE|WIFI|LAN) ;;
@@ -541,7 +541,7 @@ apply_policy() {
     awk -F'|' '
         /^[[:space:]]*#/ {next}
         NF == 0 {next}
-        NF == 3 {print $1 "|" $2 "|" $3}
+        NF == 3 {printf "%.0f|%s|%s\n", $1 + 0, $2, $3}
     ' "$POLICY_FILE" | sort -u > "$TMP_POLICY"
 
     if [ -f "$POLICY_STATE_FILE" ] && cmp -s "$TMP_POLICY" "$POLICY_STATE_FILE"; then

@@ -38,10 +38,9 @@ case "$uid" in
 '; exit 1 ;;
 esac
 
-case "$uid" in
-    0|[0-9]|[0-9][0-9]|[0-9][0-9][0-9]|[0-9][0-9][0-9][0-9]) printf '{"status":"ERROR","error":"Invalid UID"}
-'; exit 1 ;;
-esac
+[ "$uid" -ge 1 ] && [ "$uid" -le 2147483647 ] || { printf '%s\n' '{"status":"ERROR","error":"Invalid UID"}'; exit 1; }
+
+uid="$(printf '%s\n' "$uid" | awk '{sub(/^0+/, ""); if ($0 == "") $0="0"; print}')"
 
 case "$network" in
     MOBILE|WIFI|LAN) ;;
