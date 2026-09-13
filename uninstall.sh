@@ -12,12 +12,12 @@ remove_chain() {
     TABLE="$1"
     CHAIN="$2"
 
-    while "$TABLE" -C OUTPUT -j "$CHAIN" >/dev/null 2>&1; do
-        "$TABLE" -D OUTPUT -j "$CHAIN" >/dev/null 2>&1 || break
+    while "$TABLE" -w 5 -C OUTPUT -j "$CHAIN" >/dev/null 2>&1; do
+        "$TABLE" -w 5 -D OUTPUT -j "$CHAIN" >/dev/null 2>&1 || break
     done
 
-    "$TABLE" -F "$CHAIN" >/dev/null 2>&1
-    "$TABLE" -X "$CHAIN" >/dev/null 2>&1
+    "$TABLE" -w 5 -F "$CHAIN" >/dev/null 2>&1
+    "$TABLE" -w 5 -X "$CHAIN" >/dev/null 2>&1
 }
 
 remove_firewall() {
