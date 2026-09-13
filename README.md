@@ -54,6 +54,9 @@ The module's WebUI is available at:
 
 The module's Action button can also be used to open the WebUI.
 
+The WebUI can also be installed as a Progressive Web App (PWA) from
+a supported browser, providing a standalone app-like interface.
+
 ## Using PixelFirewall
 
 ### Application policies
