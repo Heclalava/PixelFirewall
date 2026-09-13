@@ -468,6 +468,7 @@ button{color:inherit}
     inset -2px -2px 4px rgba(0,0,0,.55),
     0 6px 14px rgba(0,0,0,.6);
 }
+.bulk-progress-modal{max-width:360px;padding:13px}.bulk-progress-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.bulk-progress-head h2{margin:0;font-size:17px}.bulk-progress-state{font-size:11px;font-weight:700;color:var(--muted);white-space:nowrap}.bulk-progress-state.ok{color:var(--engine-green)}.bulk-progress-state.err{color:var(--red)}.bulk-progress-track{height:8px;margin:12px 0 7px;background:var(--bg);border:1px solid var(--line);border-radius:5px;overflow:hidden;box-shadow:inset 1px 1px 3px rgba(0,0,0,.55)}.bulk-progress-bar{width:0;height:100%;background:var(--engine-green);border-radius:4px;box-shadow:0 0 5px rgba(142,192,124,.28);transition:width .12s ease}.bulk-progress-meta{display:flex;justify-content:space-between;color:var(--muted);font-size:11px;margin-bottom:10px}.bulk-progress-error{display:none;color:var(--red);font-size:11px;line-height:1.35;margin:0 0 10px}.bulk-progress-error.show{display:block}.bulk-progress-modal button:disabled{opacity:.45;cursor:default}
 
 .modal h2{
   font-size:18px;
@@ -595,6 +596,25 @@ button{color:inherit}
     <button class="danger" onclick="clearAll()">Clear all PixelFirewall blocks</button>
     <button onclick="hideBackup()">Cancel</button>
     <input id="importFile" type="file" accept=".json,application/json" hidden onchange="importBackup(this.files[0])"/>
+  </div>
+</div>
+
+<div id="bulkProgressBack" class="modal-back" style="z-index:110">
+  <div class="modal bulk-progress-modal">
+    <div class="bulk-progress-head">
+      <h2 id="bulkProgressTitle">Updating policy</h2>
+      <span id="bulkProgressState" class="bulk-progress-state">RUNNING</span>
+    </div>
+    <p id="bulkProgressStatus">Applying PixelFirewall policy changes…</p>
+    <div class="bulk-progress-track">
+      <div id="bulkProgressBar" class="bulk-progress-bar"></div>
+    </div>
+    <div class="bulk-progress-meta">
+      <span id="bulkProgressCount">0 / 0</span>
+      <span id="bulkProgressPercent">0%</span>
+    </div>
+    <p id="bulkProgressError" class="bulk-progress-error"></p>
+    <button id="bulkProgressClose" onclick="hideBulkProgress()" disabled>Close</button>
   </div>
 </div>
 
@@ -982,15 +1002,19 @@ async function bulkNetwork(n,action){
     return;
   }
 
-  const block=action==="BLOCK";
-
   if(writeBusy){
     toast("Policy update in progress");
     return;
   }
 
+  const block=action==="BLOCK";
+  const total=rows.length;
+  const label=(block?"Block ":"Allow ")+n;
+
   writeBusy=true;
-  toast("Updating "+rows.length+" apps…");
+  showBulkProgress(label,total);
+
+  let done=0;
 
   try{
     for(const a of rows){
@@ -1003,17 +1027,22 @@ async function bulkNetwork(n,action){
       }else{
         policy.delete(key);
       }
+
+      done++;
+      updateBulkProgress(done,total);
     }
 
     updateRuleCount();
     policySignature=getPolicySignature();
     render();
-
+    finishBulkProgress(true,label+" complete","");
     toast("Policy updated");
   }catch(e){
-    toast("Bulk update failed");
+    finishBulkProgress(false,"Stopped after "+done+" of "+total+" apps","PF-BULK-005");
     await loadPolicy().catch(()=>{});
+    policySignature=getPolicySignature();
     render();
+    toast("Bulk update failed");
   }finally{
     writeBusy=false;
   }
@@ -1144,32 +1173,45 @@ async function importBackup(file){
       return;
     }
 
-    writeBusy=true;
-    toast("Importing…");
-
     const current=policy;
+    const changes=[];
 
     for(const key of current.keys()){
       if(!next.has(key)){
-        const p=key.split("|");
-        await postPolicy(p[0],p[1],"ALLOW");
+        changes.push([key,"ALLOW"]);
       }
     }
 
     for(const key of next.keys()){
       if(!current.has(key)){
-        const p=key.split("|");
-        await postPolicy(p[0],p[1],"BLOCK");
+        changes.push([key,"BLOCK"]);
       }
     }
 
-    policy=next;
-    policySignature=getPolicySignature();
-
+    writeBusy=true;
     hideBackup();
+    showBulkProgress("Import policy",changes.length);
+
+    let done=0;
+
+    for(const [key,action] of changes){
+      const p=key.split("|");
+      await postPolicy(p[0],p[1],action);
+      done++;
+      updateBulkProgress(done,changes.length);
+    }
+
+    policy=next;
+    updateRuleCount();
+    policySignature=getPolicySignature();
     render();
+    finishBulkProgress(true,"Import policy complete","");
     toast("Policy imported");
   }catch(e){
+    finishBulkProgress(false,"Import policy failed","PF-BULK-006");
+    await loadPolicy().catch(()=>{});
+    policySignature=getPolicySignature();
+    render();
     toast("Import failed");
   }finally{
     writeBusy=false;
@@ -1186,6 +1228,53 @@ async function clearAll(){
   }
 
   showClearConfirm();
+}
+
+function showBulkProgress(title,total){
+  const back=document.getElementById("bulkProgressBack");
+  const state=document.getElementById("bulkProgressState");
+  const close=document.getElementById("bulkProgressClose");
+  document.getElementById("bulkProgressTitle").textContent=title;
+  document.getElementById("bulkProgressStatus").textContent="Applying PixelFirewall policy changes…";
+  document.getElementById("bulkProgressBar").style.width="0%";
+  document.getElementById("bulkProgressCount").textContent="0 / "+total;
+  document.getElementById("bulkProgressPercent").textContent="0%";
+  document.getElementById("bulkProgressError").textContent="";
+  document.getElementById("bulkProgressError").classList.remove("show");
+  state.textContent="RUNNING";
+  state.className="bulk-progress-state";
+  close.disabled=true;
+  back.style.display="flex";
+}
+
+function updateBulkProgress(done,total){
+  const percent=total?Math.round((done/total)*100):100;
+  document.getElementById("bulkProgressBar").style.width=percent+"%";
+  document.getElementById("bulkProgressCount").textContent=done+" / "+total;
+  document.getElementById("bulkProgressPercent").textContent=percent+"%";
+}
+
+function finishBulkProgress(success,message,code){
+  const state=document.getElementById("bulkProgressState");
+  const close=document.getElementById("bulkProgressClose");
+  const status=document.getElementById("bulkProgressStatus");
+  const error=document.getElementById("bulkProgressError");
+  state.textContent=success?"COMPLETE":"FAILED";
+  state.className="bulk-progress-state "+(success?"ok":"err");
+  status.textContent=message;
+  if(success){
+    error.textContent="";
+    error.classList.remove("show");
+  }else{
+    error.textContent=code+(message?" — "+message:"");
+    error.classList.add("show");
+  }
+  close.disabled=false;
+}
+
+function hideBulkProgress(){
+  if(writeBusy)return;
+  document.getElementById("bulkProgressBack").style.display="none";
 }
 
 function showClearConfirm(){
