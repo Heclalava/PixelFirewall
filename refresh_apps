@@ -8,8 +8,9 @@ USERS="$DATA_DIR/users.$$"
 LABELS="$DATA_DIR/labels.conf"
 APK_LABEL="/data/adb/modules/pixelfirewall/apklabel"
 APK_LABELS="$DATA_DIR/apklabels.$$"
+APK_PATHS="$DATA_DIR/apkpaths.$$"
 
-trap 'rm -f "$TMP" "$USERS" "$APK_LABELS" "$DATA_DIR"/systems.* "$DATA_DIR"/packages.* "$DATA_DIR"/apps.[0-9]*' EXIT
+trap 'rm -f "$TMP" "$USERS" "$APK_LABELS" "$APK_PATHS" "$DATA_DIR"/systems.* "$DATA_DIR"/packages.* "$DATA_DIR"/apps.[0-9]*' EXIT
 
 mkdir -p "$DATA_DIR" || exit 1
 
@@ -37,6 +38,9 @@ first=1
 
 : > "$APK_LABELS"
 
+"$PM" list packages -f -U 2>/dev/null |
+/system/bin/sed -n 's/^package:\(.*\.apk\)=\([^ ]*\).*/\2|\1/p' > "$APK_PATHS"
+
 for user in $(/system/bin/cut -d'|' -f1 "$USERS")
 do
     [ -z "$user" ] && continue
@@ -60,9 +64,7 @@ do
             0|1000|1001|2000) continue ;;
         esac
 
-        apk=$("$PM" path "$pkg" </dev/null 2>/dev/null |
-            /system/bin/sed -n 's/^package:\(.*\.apk\)$/\1/p' |
-            /system/bin/head -n 1)
+        apk=$(/system/bin/awk -F'|' -v p="$pkg" '$1 == p {print $2; exit}' "$APK_PATHS")
 
         [ -z "$apk" ] && continue
 
