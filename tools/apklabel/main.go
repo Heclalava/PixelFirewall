@@ -79,7 +79,7 @@ func main() {
         os.Exit(1)
     }
 
-    label, err := manifest.App.Label.WithResTableConfig(nil).String()
+    label, err := manifest.App.Label.WithResTableConfig(&androidbinary.ResTableConfig{}).String()
     if err != nil || label == "" || androidbinary.IsResID(label) {
         os.Exit(1)
     }
