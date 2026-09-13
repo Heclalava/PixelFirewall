@@ -3,6 +3,4 @@ name=PixelFirewall
 version=v1
 versionCode=1000
 author=Heclalava
-webuiIcon=icon.png
-actionIcon=icon.png
 description=Root-native per-app firewall for IPv4 and IPv6
