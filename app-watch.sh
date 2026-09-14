@@ -1,7 +1,7 @@
 #!/system/bin/sh
 
 MODDIR="${0%/*}"
-DATA_DIR="/data/adb/pixelfirewall"
+DATA_DIR="/data/adb/tirnsecurity"
 LOGCAT="/system/bin/logcat"
 SH="/system/bin/sh"
 

@@ -1,6 +1,6 @@
 #!/system/bin/sh
 MODDIR="${0%/*}"
-DATA_DIR="/data/adb/pixelfirewall"
+DATA_DIR="/data/adb/tirnsecurity"
 HTTPD="/data/adb/magisk/busybox"
 PORT=8765
 PIDFILE="$DATA_DIR/httpd.pid"

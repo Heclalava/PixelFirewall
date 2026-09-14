@@ -32,6 +32,6 @@ remove_firewall() {
 remove_firewall "$IPTABLES"
 remove_firewall "$IP6TABLES"
 
-rm -rf /data/adb/pixelfirewall
+rm -rf /data/adb/tirnsecurity
 
 exit 0

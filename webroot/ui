@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
 <meta name="theme-color" content="#282828"/>
 <link rel="manifest" href="/manifest.json"/>
-<title>PixelFirewall</title>
+<title>TIRN Security</title>
 <style>
 :root{
   --bg:#282828;--panel:#32302f;--panel2:#3c3836;--line:#504945;
@@ -504,7 +504,7 @@ button{color:inherit}
 <header class="header">
   <div class="header-row">
     <div>
-      <div class="brand">PIXELFIREWALL</div>
+      <div class="brand">TIRN SECURITY</div>
       <div class="statusline">
         <span id="engine">ENGINE …</span>
         <span>•</span>
@@ -569,7 +569,7 @@ button{color:inherit}
 
   <main id="list" class="list">
     <div id="appRows">
-      <div class="loading">Loading PixelFirewall…</div>
+      <div class="loading">Loading TIRN Security…</div>
     </div>
   </main>
 
@@ -582,7 +582,7 @@ button{color:inherit}
 </div>
 
 <div class="footer">
-  PixelFirewall manages only PixelFirewall-owned chains.
+  TIRN Security manages only TIRN Security-owned chains.
 </div>
 
 <div id="toast" class="toast"></div>
@@ -590,10 +590,10 @@ button{color:inherit}
 <div id="modalBack" class="modal-back" onclick="if(event.target===this)hideBackup()">
   <div class="modal">
     <h2>Policy backup</h2>
-    <p>Backups contain PixelFirewall policy entries only. No Android firewall chains are modified by these operations.</p>
+    <p>Backups contain TIRN Security policy entries only. No Android firewall chains are modified by these operations.</p>
     <button onclick="exportBackup()">Export policy</button>
     <button onclick="document.getElementById('importFile').click()">Import policy</button>
-    <button class="danger" onclick="clearAll()">Clear all PixelFirewall blocks</button>
+    <button class="danger" onclick="clearAll()">Clear all TIRN Security blocks</button>
     <button onclick="hideBackup()">Cancel</button>
     <input id="importFile" type="file" accept=".json,application/json" hidden onchange="importBackup(this.files[0])"/>
   </div>
@@ -605,7 +605,7 @@ button{color:inherit}
       <h2 id="bulkProgressTitle">Updating policy</h2>
       <span id="bulkProgressState" class="bulk-progress-state">RUNNING</span>
     </div>
-    <p id="bulkProgressStatus">Applying PixelFirewall policy changes…</p>
+    <p id="bulkProgressStatus">Applying TIRN Security policy changes…</p>
     <div class="bulk-progress-track">
       <div id="bulkProgressBar" class="bulk-progress-bar"></div>
     </div>
@@ -620,8 +620,8 @@ button{color:inherit}
 
 <div id="clearConfirmBack" class="modal-back" onclick="if(event.target===this)hideClearConfirm()">
   <div class="modal">
-    <h2>Clear all PixelFirewall blocks?</h2>
-    <p>This will remove all PixelFirewall policy rules. No Android firewall chains are modified by this operation.</p>
+    <h2>Clear all TIRN Security blocks?</h2>
+    <p>This will remove all TIRN Security policy rules. No Android firewall chains are modified by this operation.</p>
     <button class="danger" onclick="confirmClearAll()">Clear all blocks</button>
     <button onclick="hideClearConfirm()">Cancel</button>
   </div>
@@ -1088,7 +1088,7 @@ async function refreshAll(){
     toast("Refreshed");
   }catch(e){
     document.getElementById("list").innerHTML=
-      '<div class="empty">PixelFirewall CGI unavailable</div>';
+      '<div class="empty">TIRN Security CGI unavailable</div>';
     toast("Refresh failed");
   }
 }
@@ -1104,7 +1104,7 @@ function hideBackup(){
 function exportBackup(){
   const data={
     version:3,
-    type:"PixelFirewall",
+    type:"TIRN Security",
     timestamp:new Date().toISOString(),
     policy:Array.from(policy.keys()).map(k=>{
       const p=k.split("|");
@@ -1129,7 +1129,7 @@ function exportBackup(){
   const url=URL.createObjectURL(blob);
   const a=document.createElement("a");
   a.href=url;
-  a.download="pixelfirewall-policy-"+(()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")+"-"+String(d.getHours()).padStart(2,"0")+String(d.getMinutes()).padStart(2,"0")})()+".json";
+  a.download="tirn-security-policy-"+(()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")+"-"+String(d.getHours()).padStart(2,"0")+String(d.getMinutes()).padStart(2,"0")})()+".json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -1146,7 +1146,7 @@ async function importBackup(file){
     const d=JSON.parse(text);
 
     if(
-      d.type!=="PixelFirewall"||
+      d.type!=="TIRN Security"||
       !Array.isArray(d.policy)
     ){
       throw new Error("Invalid backup");
@@ -1235,7 +1235,7 @@ function showBulkProgress(title,total){
   const state=document.getElementById("bulkProgressState");
   const close=document.getElementById("bulkProgressClose");
   document.getElementById("bulkProgressTitle").textContent=title;
-  document.getElementById("bulkProgressStatus").textContent="Applying PixelFirewall policy changes…";
+  document.getElementById("bulkProgressStatus").textContent="Applying TIRN Security policy changes…";
   document.getElementById("bulkProgressBar").style.width="0%";
   document.getElementById("bulkProgressCount").textContent="0 / "+total;
   document.getElementById("bulkProgressPercent").textContent="0%";
@@ -1317,10 +1317,10 @@ async function init(){
     await readEngine();
     render();
   }catch(e){
-    console.error("PixelFirewall init failed:",e);
+    console.error("TIRN Security init failed:",e);
     document.getElementById("list").innerHTML=
       '<div class="empty">'+String(e)+'</div>';
-    toast("PixelFirewall CGI unavailable");
+    toast("TIRN Security CGI unavailable");
   }
 }
 
@@ -1343,7 +1343,7 @@ async function refreshPolicy(force=false){
       render();
     }
   }catch(e){
-    console.error("PixelFirewall policy refresh failed:",e);
+    console.error("TIRN Security policy refresh failed:",e);
   }finally{
     policyRefreshBusy=false;
   }

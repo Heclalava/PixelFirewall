@@ -1,6 +1,6 @@
 {
-  "name": "PixelFirewall",
-  "short_name": "PixelFirewall",
+  "name": "TIRN Security",
+  "short_name": "TIRN Security",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

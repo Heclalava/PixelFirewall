@@ -1,12 +1,12 @@
 #!/system/bin/sh
 
 PM="/system/bin/pm"
-DATA_DIR="/data/adb/pixelfirewall"
+DATA_DIR="/data/adb/tirnsecurity"
 CACHE="$DATA_DIR/apps.json"
 TMP="$DATA_DIR/apps.json.$$"
 USERS="$DATA_DIR/users.$$"
 LABELS="$DATA_DIR/labels.conf"
-APK_LABEL="/data/adb/modules/pixelfirewall/apklabel"
+APK_LABEL="/data/adb/modules/tirnsecurity/apklabel"
 APK_LABELS="$DATA_DIR/apklabels.$$"
 APK_PATHS="$DATA_DIR/apkpaths.$$"
 

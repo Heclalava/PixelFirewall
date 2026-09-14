@@ -2,7 +2,7 @@
 
 MODDIR="${0%/*}"
 chmod 755 "$MODDIR/policy-watch.sh" "$MODDIR/policy-watch.sh-handler"
-DATA_DIR="/data/adb/pixelfirewall"
+DATA_DIR="/data/adb/tirnsecurity"
 LOG_FILE="$DATA_DIR/service.log"
 STATE_FILE="$DATA_DIR/network.state"
 POLICY_FILE="$DATA_DIR/policy.conf"
@@ -614,7 +614,7 @@ apply_policy() {
 }
 
 if [ "${1:-}" = "--refresh" ]; then
-    log_msg "=== PixelFirewall Refresh Requested ==="
+    log_msg "=== TIRN Security Refresh Requested ==="
     FAILED=0
     if setup_base_ipv4; then
         log_msg "IPv4 firewall framework refreshed"
@@ -651,10 +651,10 @@ if [ "${1:-}" = "--refresh" ]; then
         fi
     fi
     if [ "$FAILED" -eq 0 ]; then
-        log_msg "=== PixelFirewall Refresh Complete ==="
+        log_msg "=== TIRN Security Refresh Complete ==="
         exit 0
     fi
-    log_msg "=== PixelFirewall Refresh Failed ==="
+    log_msg "=== TIRN Security Refresh Failed ==="
     exit 1
 fi
 
@@ -663,7 +663,7 @@ if [ "${1:-}" = "--policy-event" ]; then
     exit $?
 fi
 
-log_msg "=== PixelFirewall Activated ==="
+log_msg "=== TIRN Security Activated ==="
 
 sleep 10
 
@@ -695,7 +695,7 @@ else
     log_msg "ERROR: Firewall policy initialization failed"
 fi
 
-log_msg "=== PixelFirewall Ready (Phase 3, fail-open) ==="
+log_msg "=== TIRN Security Ready (Phase 3, fail-open) ==="
 
 "$MODDIR/policy-watch.sh" "$POLICY_FILE:w" "$DATA_DIR:nm" >/dev/null 2>&1 &
 POLICY_WATCH_PID=$!

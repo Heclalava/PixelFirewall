@@ -1,7 +1,7 @@
 #!/system/bin/sh
 
 MODDIR="$MODPATH"
-DATA_DIR="/data/adb/pixelfirewall"
+DATA_DIR="/data/adb/tirnsecurity"
 INSTALL_LOG="$DATA_DIR/installation.log"
 
 mkdir -p "$DATA_DIR"
@@ -28,7 +28,7 @@ ARCH=$(getprop ro.product.cpu.abi)
 SE=$(getenforce)
 
 log_msg "========================================="
-log_msg "          PixelFirewall Installer"
+log_msg "          TIRN Security Installer"
 log_msg "========================================="
 log_msg "Module Name    : $MODNAME"
 log_msg "Version        : $MODVER"
@@ -49,6 +49,6 @@ chmod 755 "$MODDIR/webroot/cgi-bin/apps" "$MODDIR/webroot/cgi-bin/clear" "$MODDI
 touch "$DATA_DIR/blocked_uids.txt"
 chmod 600 "$DATA_DIR/blocked_uids.txt"
 
-log_msg "PixelFirewall installation files verified"
+log_msg "TIRN Security installation files verified"
 log_msg "Installation completed"
 exit 0

@@ -6,7 +6,7 @@ echo "Expires: 0"
 echo
 IPT="/system/bin/iptables"
 IP6T="/system/bin/ip6tables"
-STATE="/data/adb/pixelfirewall/network.state"
+STATE="/data/adb/tirnsecurity/network.state"
 ENGINE="OFF"
 if "$IPT" -C OUTPUT -j PIXELFW >/dev/null 2>&1 && "$IP6T" -C OUTPUT -j PIXELFW >/dev/null 2>&1; then ENGINE="ON"; fi
 W4=0

@@ -6,7 +6,7 @@ echo "Pragma: no-cache"
 echo "Expires: 0"
 echo
 
-CACHE="/data/adb/pixelfirewall/apps.json"
+CACHE="/data/adb/tirnsecurity/apps.json"
 
 if [ -f "$CACHE" ]; then
     cat "$CACHE"
