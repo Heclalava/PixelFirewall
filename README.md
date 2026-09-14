@@ -1,10 +1,10 @@
 ## Preview
 
-![PixelFirewall WebUI](Screenshot.png)
+![TIRN Security WebUI](Screenshot.png)
 
-# PixelFirewall
+# TIRN Security
 
-PixelFirewall is a rooted Android firewall module for controlling
+TIRN Security is a rooted Android firewall module for controlling
 network access on a per-application basis.
 
 It provides a lightweight WebUI for managing application network
@@ -25,7 +25,7 @@ multiple Android user profiles and both IPv4 and IPv6.
 - Live policy status
 - Policy backup and restore
 - JSON policy export/import
-- Clear all PixelFirewall policies from the WebUI
+- Clear all TIRN Security policies from the WebUI
 - Lightweight local WebUI
 - Designed for Magisk
 - No dependency on KernelSU
@@ -37,16 +37,16 @@ multiple Android user profiles and both IPv4 and IPv6.
 - Android device with working `iptables`/`ip6tables` firewall support
 - A modern web browser for the WebUI
 
-PixelFirewall is developed and tested on a rooted Google Pixel 8a.
+TIRN Security is developed and tested on a rooted Google Pixel 8a.
 
 ## Installation
 
-Install PixelFirewall as a Magisk module using the standard Magisk
+Install TIRN Security as a Magisk module using the standard Magisk
 module installation process.
 
 After installation, reboot the device if required by Magisk.
 
-PixelFirewall provides a local WebUI for managing policies.
+TIRN Security provides a local WebUI for managing policies.
 
 The module's WebUI is available at:
 
@@ -57,7 +57,7 @@ The module's Action button can also be used to open the WebUI.
 The WebUI can also be installed as a Progressive Web App (PWA) from
 a supported browser, providing a standalone app-like interface.
 
-## Using PixelFirewall
+## Using TIRN Security
 
 ### Application policies
 
@@ -80,7 +80,7 @@ separate configuration screen.
 
 ### Profiles
 
-PixelFirewall supports Android's multiple-user environment.
+TIRN Security supports Android's multiple-user environment.
 
 Applications are associated with their Android user/profile,
 allowing policies to be managed independently for applications
@@ -106,7 +106,7 @@ Applications can also be searched directly from the WebUI.
 
 ## VPN handling
 
-PixelFirewall tracks the underlying network used by VPN
+TIRN Security tracks the underlying network used by VPN
 connections so that network policies continue to follow the
 appropriate physical network.
 
@@ -115,9 +115,9 @@ remain effective when applications are using a VPN connection.
 
 ## Policy backup and restore
 
-PixelFirewall can export its current policy to a JSON backup file.
+TIRN Security can export its current policy to a JSON backup file.
 
-Backups contain PixelFirewall policy entries only.
+Backups contain TIRN Security policy entries only.
 
 Each exported policy entry contains the policy information and,
 when the matching application is available, application metadata:
@@ -132,55 +132,55 @@ when the matching application is available, application metadata:
 - System/user app classification
 
 The UID, network type, and action are used to identify and restore
-the corresponding PixelFirewall policy. The application metadata is
+the corresponding TIRN Security policy. The application metadata is
 included to make the backup easier to read and audit.
 
 A backup can later be imported to restore the corresponding
-PixelFirewall policies.
+TIRN Security policies.
 
-Importing a backup replaces the current PixelFirewall policy state
+Importing a backup replaces the current TIRN Security policy state
 with the policies contained in the backup.
 
-The WebUI also provides an option to clear all PixelFirewall blocks.
+The WebUI also provides an option to clear all TIRN Security blocks.
 
-## How PixelFirewall works
+## How TIRN Security works
 
-PixelFirewall maintains its own firewall policy chains and uses
+TIRN Security maintains its own firewall policy chains and uses
 them to apply application-specific network policies.
 
-The primary PixelFirewall chains are:
+The primary TIRN Security chains are:
 
 - `PIXELFW`
 - `PIXELFW-MOBILE`
 - `PIXELFW-WIFI`
 - `PIXELFW-LAN`
 
-IPv6 uses the corresponding PixelFirewall-owned chains as well.
+IPv6 uses the corresponding TIRN Security-owned chains as well.
 
 The main `PIXELFW` dispatcher determines the appropriate
-PixelFirewall network policy chain based on the active network.
+TIRN Security network policy chain based on the active network.
 
 Application policies are then applied using the application's
 Android UID.
 
-This keeps PixelFirewall's policy state separate from unrelated
+This keeps TIRN Security's policy state separate from unrelated
 Android native firewall configuration.
 
 ## Firewall scope and safety
 
-PixelFirewall is designed to operate only on firewall chains owned
-by PixelFirewall.
+TIRN Security is designed to operate only on firewall chains owned
+by TIRN Security.
 
-**PixelFirewall does not flush, delete, or modify unrelated/native
+**TIRN Security does not flush, delete, or modify unrelated/native
 Android firewall chains or rules.**
 
-The WebUI manages PixelFirewall policy state rather than directly
+The WebUI manages TIRN Security policy state rather than directly
 manipulating the device's native firewall configuration.
 
 Policy backup, import, and clear operations likewise operate only
-on PixelFirewall policy entries.
+on TIRN Security policy entries.
 
-This separation is an important part of PixelFirewall's design.
+This separation is an important part of TIRN Security's design.
 
 ## WebUI
 
@@ -206,8 +206,8 @@ The main interface provides:
 
 ### The WebUI does not load
 
-Check that the PixelFirewall module is enabled in Magisk and that
-the PixelFirewall WebUI server is running.
+Check that the TIRN Security module is enabled in Magisk and that
+the TIRN Security WebUI server is running.
 
 The WebUI is served locally on:
 
@@ -231,7 +231,7 @@ appear when a different profile is selected.
 
 ### A policy does not appear immediately
 
-PixelFirewall refreshes policy state through the WebUI API.
+TIRN Security refreshes policy state through the WebUI API.
 
 The WebUI also polls for policy changes while it is visible.
 Refreshing the page forces the interface to reload the current policy
@@ -239,7 +239,7 @@ state.
 
 ### Network behaviour changes after switching networks
 
-PixelFirewall maintains a network dispatcher so that policies can
+TIRN Security maintains a network dispatcher so that policies can
 follow changes between Wi-Fi, mobile data, LAN, and VPN underlying
 networks.
 
@@ -248,19 +248,19 @@ wrong state, first refresh the WebUI and verify the current policy.
 
 ## Development
 
-PixelFirewall is developed as a Magisk module with its firewall
+TIRN Security is developed as a Magisk module with its firewall
 engine, network dispatcher, policy storage, application metadata
 helper, and WebUI maintained as separate components.
 
 The WebUI is served locally by the module and communicates with
-PixelFirewall through CGI endpoints.
+TIRN Security through CGI endpoints.
 
 The project is developed and tested on-device using a rooted Pixel
 8a and Linux development environment.
 
 ## Project principles
 
-PixelFirewall follows a few core principles:
+TIRN Security follows a few core principles:
 
 1. **Application-level control**
 
@@ -281,7 +281,7 @@ PixelFirewall follows a few core principles:
 
 5. **Minimal firewall scope**
 
-   PixelFirewall operates only on its own firewall chains.
+   TIRN Security operates only on its own firewall chains.
 
 6. **Simple management**
 
@@ -290,7 +290,7 @@ PixelFirewall follows a few core principles:
 
 ## Donations
 
-If you find PixelFirewall useful and would like to support its
+If you find TIRN Security useful and would like to support its
 development, donations are appreciated but entirely optional.
 
 ### PEP
@@ -309,5 +309,5 @@ Thank you for supporting the project.
 
 ## License
 
-See the repository license for the terms under which PixelFirewall
+See the repository license for the terms under which TIRN Security
 is distributed.
